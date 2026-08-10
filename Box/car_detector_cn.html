@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚗 AI 汽车检测器（带边界框）</title>
+    <!-- 引入 TensorFlow.js 和 COCO-SSD -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@latest"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: #16213e;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: #0f3460;
+            text-shadow: 0 0 10px #00d2ff;
+        }
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            margin: 15px 0;
+            border: 2px solid #0f3460;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            pointer-events: none; /* 允许点击视频控件 */
+        }
+        .info-panel {
+            display: flex;
+            justify-content: space-around;
+            background: #0f3460;
+            padding: 12px;
+            border-radius: 12px;
+            margin: 10px 0;
+            font-size: 1.2rem;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .info-item {
+            background: #1a1a2e;
+            padding: 6px 18px;
+            border-radius: 30px;
+            border: 1px solid #00d2ff;
+        }
+        .info-item span {
+            color: #00d2ff;
+            font-weight: bold;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        .btn {
+            padding: 12px 28px;
+            border: none;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #0f3460;
+            color: #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .btn:hover { transform: scale(1.05); }
+        .btn:active { transform: scale(0.95); }
+        .btn-primary { background: #00d2ff; color: #000; }
+        .btn-danger { background: #e94560; }
+        .btn-warning { background: #f5a623; color: #000; }
+        .btn:disabled { opacity: 0.5; pointer-events: none; }
+        .status-text {
+            margin-top: 12px;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+        .note {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 10px;
+            border-top: 1px solid #333;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🚗 汽车检测器</h1>
+    <p style="color: #aaa;">带边界框 · 距离估算</p>
+
+    <div class="video-wrapper">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div class="info-panel">
+        <div class="info-item">🚘 汽车 <span id="carCount">0</span></div>
+        <div class="info-item">📏 距离 <span id="distance">--</span> m</div>
+        <div class="info-item">🌓 模式 <span id="modeDisplay">白天</span></div>
+    </div>
+
+    <div class="controls">
+        <button id="startBtn" class="btn btn-primary">▶ 启动</button>
+        <button id="stopBtn" class="btn btn-danger" disabled>⏹ 停止</button>
+        <button id="nightBtn" class="btn btn-warning">🌙 夜间模式</button>
+    </div>
+
+    <div class="status-text" id="status">未启动</div>
+    <div class="note">所有处理在本地完成，不上传任何数据 · 模型：COCO-SSD</div>
+</div>
+
+<script>
+    (function() {
+        // ---------- DOM 引用 ----------
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const carCountSpan = document.getElementById('carCount');
+        const distanceSpan = document.getElementById('distance');
+        const modeDisplay = document.getElementById('modeDisplay');
+        const statusDiv = document.getElementById('status');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const nightBtn = document.getElementById('nightBtn');
+
+        // ---------- 状态变量 ----------
+        let isRunning = false;
+        let isNightMode = false;         // 夜间模式：降低亮度，提高检测阈值
+        let model = null;
+        let stream = null;
+        let animationId = null;
+
+        // 检测参数
+        const CONFIDENCE_THRESHOLD_DAY = 0.5;
+        const CONFIDENCE_THRESHOLD_NIGHT = 0.65;  // 夜间提高阈值减少误报
+        let currentThreshold = CONFIDENCE_THRESHOLD_DAY;
+
+        // 距离估算参数（根据框底部宽度与图像宽度的比例）
+        const IMAGE_WIDTH_REF = 640;       // 模型输入宽度（近似）
+        const DISTANCE_MAX = 30;           // 最远距离 (米)
+        const DISTANCE_MIN = 1.5;          // 最近距离 (米)
+        const WIDTH_RATIO_MIN = 0.02;      // 框宽占比最小（对应最远）
+        const WIDTH_RATIO_MAX = 0.6;       // 框宽占比最大（对应最近）
+
+        // ---------- 辅助函数：距离估算 ----------
+        function estimateDistance(bboxWidth, imageWidth) {
+            // bboxWidth 是像素宽度，imageWidth 是当前视频帧的实际宽度
+            const ratio = bboxWidth / imageWidth;
+            // 限制范围
+            const clamped = Math.min(Math.max(ratio, WIDTH_RATIO_MIN), WIDTH_RATIO_MAX);
+            // 线性映射：ratio 越大，距离越小
+            const t = (clamped - WIDTH_RATIO_MIN) / (WIDTH_RATIO_MAX - WIDTH_RATIO_MIN);
+            const dist = DISTANCE_MAX - t * (DISTANCE_MAX - DISTANCE_MIN);
+            return Math.round(dist * 10) / 10; // 保留一位小数
+        }
+
+        // ---------- 绘制边界框 ----------
+        function drawBoxes(predictions, canvasWidth, canvasHeight, imageWidth, imageHeight) {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+            // 筛选汽车
+            const cars = predictions.filter(p => p.class === 'car' && p.score >= currentThreshold);
+
+            // 更新计数
+            carCountSpan.textContent = cars.length;
+
+            // 如果没有汽车，距离显示 "--"
+            if (cars.length === 0) {
+                distanceSpan.textContent = '--';
+                return;
+            }
+
+            // 取置信度最高的汽车来估算距离（也可取最近的，即框最大的）
+            // 这里选择框面积最大的（最可能最近）
+            let maxArea = 0;
+            let closestCar = null;
+            for (let car of cars) {
+                const [x, y, w, h] = car.bbox;
+                const area = w * h;
+                if (area > maxArea) {
+                    maxArea = area;
+                    closestCar = car;
+                }
+            }
+
+            // 绘制所有汽车框
+            for (let car of cars) {
+                const [x, y, w, h] = car.bbox;
+                // 坐标映射到 canvas 尺寸
+                const scaleX = canvasWidth / imageWidth;
+                const scaleY = canvasHeight / imageHeight;
+                const rectX = x * scaleX;
+                const rectY = y * scaleY;
+                const rectW = w * scaleX;
+                const rectH = h * scaleY;
+
+                // 画框
+                ctx.strokeStyle = '#00ff88';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(rectX, rectY, rectW, rectH);
+
+                // 标签背景
+                const label = `car ${(car.score * 100).toFixed(0)}%`;
+                ctx.font = 'bold 16px sans-serif';
+                const textMetrics = ctx.measureText(label);
+                const textWidth = textMetrics.width;
+                const textHeight = 24;
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(rectX, rectY - textHeight, textWidth + 10, textHeight);
+                ctx.fillStyle = '#00ff88';
+                ctx.fillText(label, rectX + 5, rectY - 6);
+            }
+
+            // 计算最近汽车的距离（使用 closestCar）
+            if (closestCar) {
+                const [x, y, w, h] = closestCar.bbox;
+                // 使用框宽度和当前视频实际宽度（已知 video.videoWidth）
+                const dist = estimateDistance(w, imageWidth);
+                distanceSpan.textContent = dist.toFixed(1);
+            } else {
+                distanceSpan.textContent = '--';
+            }
+        }
+
+        // ---------- 检测循环 ----------
+        async function detectFrame() {
+            if (!isRunning) return;
+
+            try {
+                // 确保视频已经准备好
+                if (video.readyState < 2) {
+                    animationId = requestAnimationFrame(detectFrame);
+                    return;
+                }
+
+                // 执行检测
+                const predictions = await model.detect(video);
+
+                // 绘制
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+                const imageWidth = video.videoWidth;
+                const imageHeight = video.videoHeight;
+                drawBoxes(predictions, canvasWidth, canvasHeight, imageWidth, imageHeight);
+
+                // 继续下一帧
+                animationId = requestAnimationFrame(detectFrame);
+            } catch (err) {
+                console.error('检测出错:', err);
+                statusDiv.textContent = '❌ 检测出错: ' + err.message;
+                stopDetection();
+            }
+        }
+
+        // ---------- 启动检测 ----------
+        async function startDetection() {
+            if (isRunning) return;
+
+            // 加载模型（如果未加载）
+            if (!model) {
+                statusDiv.textContent = '⏳ 加载 AI 模型...';
+                try {
+                    model = await cocoSsd.load({
+                        base: 'lite_mobilenet_v2'  // 轻量快速
+                    });
+                    statusDiv.textContent = '✅ 模型加载完成';
+                } catch (err) {
+                    statusDiv.textContent = '❌ 模型加载失败: ' + err.message;
+                    return;
+                }
+            }
+
+            // 启动摄像头
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+                });
+                video.srcObject = stream;
+                await video.play();
+
+                // 设置 canvas 尺寸匹配视频显示尺寸（保持比例）
+                const wrapper = video.parentElement;
+                const wrapperRect = wrapper.getBoundingClientRect();
+                canvas.width = wrapperRect.width || 640;
+                canvas.height = wrapperRect.height || 480;
+                // 注意：canvas 的 CSS 会拉伸，所以我们使用固定的逻辑尺寸，但绘制时按比例缩放
+
+                // 调整 canvas 实际像素以匹配显示尺寸，避免模糊
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
+                // 设置实际分辨率
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+
+                isRunning = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                statusDiv.textContent = '🟢 运行中...';
+
+                // 开始检测循环
+                detectFrame();
+            } catch (err) {
+                statusDiv.textContent = '❌ 摄像头启动失败: ' + err.message;
+                console.error(err);
+            }
+        }
+
+        // ---------- 停止检测 ----------
+        function stopDetection() {
+            isRunning = false;
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            video.srcObject = null;
+            video.pause();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            carCountSpan.textContent = '0';
+            distanceSpan.textContent = '--';
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            statusDiv.textContent = '⏹ 已停止';
+        }
+
+        // ---------- 夜间模式切换 ----------
+        function toggleNightMode() {
+            isNightMode = !isNightMode;
+            currentThreshold = isNightMode ? CONFIDENCE_THRESHOLD_NIGHT : CONFIDENCE_THRESHOLD_DAY;
+            modeDisplay.textContent = isNightMode ? '夜间' : '白天';
+            nightBtn.textContent = isNightMode ? '☀️ 白天模式' : '🌙 夜间模式';
+            // 对视频应用 CSS 滤镜（降低亮度，增加对比度）
+            if (isNightMode) {
+                video.style.filter = 'brightness(0.6) contrast(1.5)';
+                canvas.style.filter = 'brightness(0.6) contrast(1.5)';
+            } else {
+                video.style.filter = 'none';
+                canvas.style.filter = 'none';
+            }
+            statusDiv.textContent = isNightMode ? '🌙 夜间模式（阈值提高）' : '☀️ 白天模式';
+        }
+
+        // ---------- 事件绑定 ----------
+        startBtn.addEventListener('click', startDetection);
+        stopBtn.addEventListener('click', stopDetection);
+        nightBtn.addEventListener('click', toggleNightMode);
+
+        // 页面关闭前停止
+        window.addEventListener('beforeunload', function() {
+            if (isRunning) stopDetection();
+        });
+
+        // 初始状态
+        statusDiv.textContent = '就绪，点击“启动”';
+        // 设置 canvas 初始尺寸
+        canvas.width = 640;
+        canvas.height = 480;
+    })();
+</script>
+</body>
+</html>
