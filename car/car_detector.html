@@ -137,6 +137,23 @@
     </style>
 </head>
 <body>
+<script>
+// Suppress .map 404 warnings
+(function() {
+    const originalError = console.error;
+    console.error = function(...args) {
+        const msg = args.join(' ');
+        if (msg.includes('.map') && msg.includes('404')) return;
+        originalError.apply(console, args);
+    };
+    const originalWarn = console.warn;
+    console.warn = function(...args) {
+        const msg = args.join(' ');
+        if (msg.includes('.map') && msg.includes('404')) return;
+        originalWarn.apply(console, args);
+    };
+})();
+</script>
     <div id="container">
         <div id="video-wrapper">
             <video id="video" autoplay playsinline></video>

@@ -120,6 +120,23 @@
     </style>
 </head>
 <body>
+<script>
+// Suppress .map 404 warnings
+(function() {
+    const originalError = console.error;
+    console.error = function(...args) {
+        const msg = args.join(' ');
+        if (msg.includes('.map') && msg.includes('404')) return;
+        originalError.apply(console, args);
+    };
+    const originalWarn = console.warn;
+    console.warn = function(...args) {
+        const msg = args.join(' ');
+        if (msg.includes('.map') && msg.includes('404')) return;
+        originalWarn.apply(console, args);
+    };
+})();
+</script>
 <div class="container">
     <h1>🚗 汽车检测器</h1>
     <p style="color: #aaa;">带边界框 · 距离估算</p>
