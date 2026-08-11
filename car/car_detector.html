@@ -393,7 +393,32 @@
                     ctx2.putImageData(imageData, 0, 0);
                     const predictions = await aiModel.detect(canvas2);
                     return predictions.filter(p => p.class === 'car' || p.class === 'truck' || p.class === 'bus');
-                } catch(e) {
+                }
+
+            function drawBoxes(predictions, canvasWidth, canvasHeight, imageWidth, imageHeight) {
+                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+                const cars = predictions.filter(p => p.class === "car" && p.score >= 0.5);
+                for (let car of cars) {
+                    const [x, y, w, h] = car.bbox;
+                    const scaleX = canvasWidth / imageWidth;
+                    const scaleY = canvasHeight / imageHeight;
+                    const rectX = x * scaleX;
+                    const rectY = y * scaleY;
+                    const rectW = w * scaleX;
+                    const rectH = h * scaleY;
+                    ctx.strokeStyle = "#00ff88";
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(rectX, rectY, rectW, rectH);
+                    const label = `car ${(car.score * 100).toFixed(0)}%`;
+                    ctx.font = "bold 16px sans-serif";
+                    const textWidth = ctx.measureText(label).width;
+                    ctx.fillStyle = "rgba(0,0,0,0.7)";
+                    ctx.fillRect(rectX, rectY - 24, textWidth + 10, 24);
+                    ctx.fillStyle = "#00ff88";
+                    ctx.fillText(label, rectX + 5, rectY - 6);
+                }
+            }
+ catch(e) {
                     return null;
                 }
             }
@@ -426,6 +451,7 @@
                             document.getElementById('stat-distance').textContent = distance ? `📏 ${distance.toFixed(1)}m` : '📏 --';
                             document.getElementById('stat-mode').textContent = nightMode ? '🌙 Night' : '🌞 Day';
 
+                            drawBoxes(predictions || [], canvas.width, canvas.height, w, h);
                             const stable = getStableResult(predictions.length > 0 ? 'unsafe' : 'safe');
 
                             if (predictions.length > 0) {
