@@ -1,0 +1,19 @@
+{
+  "capturedAt": "2026-08-05T10:00:00Z",
+  "url": "https://arena.ai/agent/live-test",
+  "provider": "arena-agent",
+  "extensionVersion": "1.4.9",
+  "generating": false,
+  "turns": [
+    {
+      "role": "user",
+      "chain": [],
+      "html": "<div class=\"px-3 text-text-primary body-base py-2\"><div class=\"flex flex-col gap-2\"><div class=\"prose prose-pre:bg-transparent prose-pre:p-0 text-wrap break-words prose-base body-base\"><p>list commands</p></div></div></div>"
+    },
+    {
+      "role": "assistant",
+      "chain": [],
+      "html": "<div class=\"px-3 pb-3\"><div class=\"flex flex-col gap-2\"><div class=\"prose prose-pre:bg-transparent prose-pre:p-0 text-wrap break-words prose-base body-base\"><pre><code>{\"command\":\"list_commands\"}</code></pre></div></div></div>"
+    }
+  ]
+}

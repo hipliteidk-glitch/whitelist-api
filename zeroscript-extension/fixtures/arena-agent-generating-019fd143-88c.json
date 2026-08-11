@@ -1,0 +1,15 @@
+{
+  "url": "https://arena.ai/agent/019fd143-88c2",
+  "provider": "arena-agent",
+  "generating": true,
+  "turns": [
+    {
+      "role": "user",
+      "html": "<div class=\"px-3 text-text-primary body-base py-2\"><div class=\"flex flex-col gap-2\"><div class=\"prose\">hi</div></div></div>"
+    },
+    {
+      "role": "assistant",
+      "html": "<div class=\"px-3 pb-3\"><div class=\"flex flex-col gap-2\"><div class=\"prose\"><pre><code>{\"command\":\"list_commands\"}</code></pre></div></div></div>"
+    }
+  ]
+}

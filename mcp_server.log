@@ -1,0 +1,10 @@
+ * Serving Flask app 'mcp_model_server_mcp'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.50.27:5000
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [08/Aug/2026 11:42:41] "POST /mcp HTTP/1.1" 200 -
+127.0.0.1 - - [08/Aug/2026 11:42:48] "POST /mcp HTTP/1.1" 200 -
+127.0.0.1 - - [08/Aug/2026 11:50:00] "[31m[1mPOST / HTTP/1.1[0m" 400 -

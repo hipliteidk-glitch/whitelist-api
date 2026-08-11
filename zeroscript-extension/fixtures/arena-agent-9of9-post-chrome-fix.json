@@ -1,0 +1,20 @@
+{
+  "capturedAt": "2026-08-05T12:34:09.031Z",
+  "url": "https://arena.ai/agent/019fd1ea-50dc-762e-8a2b-e6a40e571a5c",
+  "provider": "arena-agent",
+  "extensionVersion": "1.4.9",
+  "generating": false,
+  "_note": "9/9 AFTER the UI-chrome fix (6168731). The undo banner is correctly absent: 2 turns, not 3. Reply is a collapsed thought block plus a JSON widget and still parses to list_commands.",
+  "turns": [
+    {
+      "role": "user",
+      "chain": [],
+      "html": "<div class=\"px-3 text-text-primary body-base py-2\"><div class=\"flex flex-col gap-2 zs-hidden\" data-zs=\"sys\" data-zphase=\"sys\"><div class=\"zs-chip cat-tool sys\"><span class=\"zs-chip-tx\">Starting Up</span></div><div class=\"prose prose-pre:bg-transparent prose-pre:p-0 text-wrap break-words prose-base body-base\"><p>\u27e6ZS-SYS\u27e7</p><p>CONTEXT: the user has installed a browser extension called ZeroScript\u2026</p></div></div></div>"
+    },
+    {
+      "role": "assistant",
+      "chain": [],
+      "html": "<div class=\"px-3 pb-3\"><div class=\"flex flex-col gap-2\" data-zs-gen-t0=\"1785933230424\" data-z-resume=\"1\" data-z-resume-len=\"925\"><div data-state=\"closed\" class=\"not-prose\"><button type=\"button\"><p class=\"leading-[normal]\">Thought for 1 second</p></button><div class=\"text-text-secondary text-sm\" style=\"height:0px;opacity:0\"><div><div class=\"relative pl-6 pr-2 pt-4\"><div class=\"space-y-4\"><p>The user message contains a system prompt for ZeroScript extension. My very first action should be to write <code>list_commands</code> with no params.</p></div></div></div></div></div><div class=\"prose prose-pre:bg-transparent prose-pre:p-0 text-wrap break-words prose-base body-base\"><pre><div class=\"not-prose\" data-code-block=\"true\"><div class=\"code-block_container__lbMX4\"><pre class=\"shiki github-dark shiki-code-block\"><code class=\"whitespace-pre-wrap break-words\">{\"command\":\"list_commands\"}</code></pre></div></div></pre></div></div></div>"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "capturedAt": "2026-08-05T00:00:00Z",
+  "url": "https://arena.ai/agent",
+  "provider": "arena-agent",
+  "extensionVersion": "1.4.9",
+  "generating": false,
+  "turns": [
+    {
+      "role": "user",
+      "chain": [],
+      "html": "<div class=\"px-3 text-text-primary body-base py-2\"><div class=\"flex flex-col gap-2\"><div class=\"prose prose-pre:bg-transparent prose-pre:p-0 text-wrap break-words prose-base body-base\">list your commands</div></div></div>"
+    },
+    {
+      "role": "assistant",
+      "chain": [],
+      "html": "<div class=\"relative pl-6 pr-2 pt-4\"><div class=\"flex flex-col gap-2\"><div class=\"prose prose-pre:bg-transparent prose-pre:p-0 text-wrap break-words prose-base body-base\"><pre><div class=\"not-prose\"><div class=\"code-block_container__lbMX4\"><pre class=\"shiki github-dark shiki-code-block\"><code class=\"whitespace-pre-wrap break-words\">{\"command\":\"list_commands\"}</code></pre></div></div></pre></div></div></div>"
+    }
+  ]
+}

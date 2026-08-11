@@ -1,0 +1,25 @@
+newmtl mat0
+Kd 0.85 0.75 0.55
+Ka 0.5 0.5 0.5
+Ks 0 0 0
+illum 1
+newmtl mat1
+Kd 0.7 0.2 0.1
+Ka 0.5 0.5 0.5
+Ks 0 0 0
+illum 1
+newmtl mat2
+Kd 0.4 0.25 0.15
+Ka 0.5 0.5 0.5
+Ks 0 0 0
+illum 1
+newmtl mat3
+Kd 0.2 0.6 0.9
+Ka 0.5 0.5 0.5
+Ks 0 0 0
+illum 1
+newmtl mat4
+Kd 0.2 0.6 0.9
+Ka 0.5 0.5 0.5
+Ks 0 0 0
+illum 1

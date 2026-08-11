@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aurat Checker – Smart Scan (MediaPipe + Skin Heuristic)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f0e1a;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background-image:
+                radial-gradient(ellipse at 10% 20%, rgba(26,86,67,0.25) 0%, transparent 60%),
+                radial-gradient(ellipse at 90% 80%, rgba(139,92,46,0.20) 0%, transparent 55%);
+        }
+        .container {
+            max-width: 1100px;
+            width: 100%;
+            background: rgba(255,255,255,0.04);
+            backdrop-filter: blur(18px);
+            border-radius: 48px;
+            padding: 28px 30px 36px;
+            border: 1px solid rgba(255,255,255,0.07);
+            box-shadow: 0 30px 80px rgba(0,0,0,0.7);
+            animation: fadeSlide 0.5s ease-out;
+        }
+        @keyframes fadeSlide {
+            0% { opacity:0; transform:translateY(12px); }
+            100% { opacity:1; transform:translateY(0); }
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 24px;
+            padding-bottom: 18px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .header-left { display: flex; align-items: center; gap: 14px; }
+        .logo-icon {
+            font-size: 26px;
+            background: linear-gradient(145deg, #2a9d8f, #1a6d5e);
+            width: 48px; height: 48px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(42,157,143,0.3);
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #f0efe7;
+            letter-spacing: -0.3px;
+        }
+        .header h1 span { color: #8bc9b5; font-weight: 300; }
+        .header .sub {
+            font-size: 13px;
+            color: rgba(255,255,255,0.35);
+            font-weight: 400;
+            letter-spacing: 1px;
+            margin-top: 2px;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255,255,255,0.04);
+            padding: 6px 10px 6px 18px;
+            border-radius: 60px;
+            border: 1px solid rgba(255,255,255,0.06);
+            flex-wrap: wrap;
+        }
+        .header-right .label {
+            color: rgba(255,255,255,0.35);
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+        }
+        .gender-toggle {
+            display: flex;
+            gap: 4px;
+            background: rgba(0,0,0,0.3);
+            padding: 4px;
+            border-radius: 40px;
+        }
+        .gender-toggle button {
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.5);
+            padding: 6px 18px;
+            border-radius: 32px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .gender-toggle button.active {
+            background: linear-gradient(145deg, #2a9d8f, #1f7a6b);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(42,157,143,0.35);
+        }
+        .gender-toggle button:hover:not(.active) {
+            color: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.05);
+        }
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 32px;
+            align-items: start;
+        }
+        @media (max-width:820px) {
+            .main-grid { grid-template-columns:1fr; gap:24px; }
+            .container { padding:18px; }
+            .header h1 { font-size:20px; }
+        }
+        .visual-panel {
+            background: rgba(0,0,0,0.3);
+            border-radius: 28px;
+            padding: 20px 18px 18px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .visual-panel .panel-title {
+            color: rgba(255,255,255,0.4);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 14px;
+        }
+        .body-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            min-height: 380px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .body-svg {
+            width: 100%;
+            max-width: 190px;
+            height: auto;
+            display: block;
+            filter: drop-shadow(0 8px 30px rgba(0,0,0,0.5));
+        }
+        .body-svg .figure-body {
+            fill: #1e1e2a;
+            stroke: rgba(255,255,255,0.08);
+            stroke-width: 1.5;
+        }
+        .body-svg .aurat-area {
+            fill: rgba(231,76,60,0.0);
+            stroke: rgba(231,76,60,0.0);
+            stroke-width: 2;
+            transition: all 0.4s ease;
+        }
+        .body-svg .aurat-area.visible {
+            fill: rgba(231,76,60,0.22);
+            stroke: rgba(231,76,60,0.4);
+        }
+        .body-svg .aurat-area.male-aurat.visible {
+            fill: rgba(52,152,219,0.18);
+            stroke: rgba(52,152,219,0.4);
+        }
+        .body-svg .aurat-area.scanned-ok {
+            fill: rgba(42,157,143,0.3) !important;
+            stroke: rgba(42,157,143,0.5) !important;
+        }
+        .body-svg .aurat-area.heuristic-cover {
+            fill: rgba(42,157,143,0.25) !important;
+            stroke: rgba(42,157,143,0.4) !important;
+        }
+        .body-svg .aurat-area.heuristic-expose {
+            fill: rgba(231,76,60,0.35) !important;
+            stroke: rgba(231,76,60,0.6) !important;
+        }
+        .body-svg .aurat-area.heuristic-unknown {
+            fill: rgba(241,196,15,0.15) !important;
+            stroke: rgba(241,196,15,0.3) !important;
+        }
+        .body-svg .clothing-item {
+            fill: rgba(255,255,255,0.02);
+            stroke: rgba(255,255,255,0.06);
+            stroke-width: 1.5;
+            transition: all 0.5s ease;
+        }
+        .body-svg .label-text {
+            fill: rgba(255,255,255,0.15);
+            font-size: 8px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            pointer-events: none;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .camera-wrapper {
+            flex: 0 0 auto;
+            width: 160px;
+            border-radius: 18px;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.06);
+            background: #0a0a12;
+            aspect-ratio: 3/4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.4s ease;
+        }
+        .camera-wrapper.hidden { display: none; }
+        .camera-wrapper video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+        .camera-wrapper canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.4;
+        }
+        .camera-wrapper .camera-placeholder {
+            color: rgba(255,255,255,0.2);
+            font-size: 12px;
+            text-align: center;
+            padding: 10px;
+            line-height: 1.6;
+        }
+        .camera-wrapper .camera-placeholder .big-icon {
+            font-size: 34px;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .camera-wrapper.active {
+            border-color: rgba(42,157,143,0.3);
+            box-shadow: 0 0 30px rgba(42,157,143,0.05);
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: rgba(255,255,255,0.4);
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .legend-item .swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 5px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .legend-item .swatch.aurat-f { background: rgba(231,76,60,0.3); border-color: rgba(231,76,60,0.25); }
+        .legend-item .swatch.aurat-m { background: rgba(52,152,219,0.25); border-color: rgba(52,152,219,0.25); }
+        .legend-item .swatch.heuristic-cover { background: rgba(42,157,143,0.4); border-color: rgba(42,157,143,0.3); }
+        .legend-item .swatch.heuristic-expose { background: rgba(231,76,60,0.4); border-color: rgba(231,76,60,0.3); }
+        .controls-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .info-card {
+            background: rgba(0,0,0,0.25);
+            border-radius: 18px;
+            padding: 16px 20px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+        .info-card .card-title {
+            color: rgba(255,255,255,0.35);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .info-card .description {
+            color: rgba(255,255,255,0.7);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .info-card .description strong { color: #f0efe7; font-weight: 600; }
+        .info-card .description .highlight-ok { color: #2a9d8f; font-weight: 600; }
+        .info-card .description .highlight-warn { color: #f1c40f; font-weight: 600; }
+        .info-card .description .highlight-danger { color: #e74c3c; font-weight: 600; }
+        .scan-progress {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .scan-progress .step {
+            flex: 1;
+            min-width: 50px;
+            padding: 6px 10px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            text-align: center;
+            font-size: 11px;
+            color: rgba(255,255,255,0.25);
+            transition: all 0.4s ease;
+            cursor: pointer;
+        }
+        .scan-progress .step:hover {
+            background: rgba(255,255,255,0.06);
+        }
+        .scan-progress .step.active {
+            border-color: rgba(241,196,15,0.3);
+            color: #f1c40f;
+            background: rgba(241,196,15,0.05);
+        }
+        .scan-progress .step.done {
+            border-color: rgba(42,157,143,0.3);
+            color: #8bc9b5;
+            background: rgba(42,157,143,0.05);
+        }
+        .scan-progress .step.fail {
+            border-color: rgba(231,76,60,0.3);
+            color: #e74c3c;
+            background: rgba(231,76,60,0.05);
+        }
+        .scan-progress .step.heuristic-cover {
+            border-color: rgba(42,157,143,0.4);
+            color: #8bc9b5;
+            background: rgba(42,157,143,0.08);
+        }
+        .scan-progress .step.heuristic-expose {
+            border-color: rgba(231,76,60,0.4);
+            color: #e74c3c;
+            background: rgba(231,76,60,0.08);
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .action-buttons button {
+            flex: 1;
+            min-width: 90px;
+            padding: 10px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.03);
+            color: rgba(255,255,255,0.7);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .action-buttons button:hover {
+            background: rgba(255,255,255,0.08);
+            border-color: rgba(255,255,255,0.12);
+        }
+        .action-buttons button.primary {
+            background: rgba(42,157,143,0.15);
+            border-color: rgba(42,157,143,0.2);
+            color: #8bc9b5;
+        }
+        .action-buttons button.primary:hover {
+            background: rgba(42,157,143,0.25);
+        }
+        .action-buttons button.primary:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .action-buttons button.danger {
+            background: rgba(231,76,60,0.1);
+            border-color: rgba(231,76,60,0.15);
+            color: #e74c3c;
+        }
+        .action-buttons button.danger:hover {
+            background: rgba(231,76,60,0.2);
+        }
+        .action-buttons button.secondary {
+            background: rgba(241,196,15,0.08);
+            border-color: rgba(241,196,15,0.12);
+            color: #f1c40f;
+        }
+        .action-buttons button.secondary:hover {
+            background: rgba(241,196,15,0.18);
+        }
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 16px;
+            border-radius: 16px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.04);
+            flex-wrap: wrap;
+        }
+        .status-bar .status-icon { font-size: 24px; line-height: 1; }
+        .status-bar .status-text {
+            flex: 1;
+            color: rgba(255,255,255,0.7);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .status-bar .status-text strong { color: #f0efe7; font-weight: 600; }
+        .status-bar .status-badge {
+            padding: 4px 14px;
+            border-radius: 40px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            background: rgba(255,255,255,0.04);
+            color: rgba(255,255,255,0.3);
+            border: 1px solid rgba(255,255,255,0.04);
+            transition: all 0.4s ease;
+        }
+        .status-bar .status-badge.compliant {
+            background: rgba(42,157,143,0.2);
+            color: #8bc9b5;
+            border-color: rgba(42,157,143,0.2);
+        }
+        .status-bar .status-badge.heuristic {
+            background: rgba(241,196,15,0.12);
+            color: #f1c40f;
+            border-color: rgba(241,196,15,0.12);
+        }
+        .status-bar .status-badge.not-compliant {
+            background: rgba(231,76,60,0.12);
+            color: #e74c3c;
+            border-color: rgba(231,76,60,0.12);
+        }
+        .footer-note {
+            margin-top: 24px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(255,255,255,0.04);
+            text-align: center;
+            color: rgba(255,255,255,0.15);
+            font-size: 12px;
+            line-height: 1.8;
+        }
+        .footer-note .arabic {
+            font-size: 17px;
+            color: rgba(255,255,255,0.2);
+            font-family: 'Times New Roman', serif;
+            display: block;
+            margin-bottom: 3px;
+        }
+        @media (max-width:600px) {
+            .header { flex-direction:column; align-items:stretch; gap:10px; }
+            .header-right { justify-content:space-between; padding:6px 6px 6px 14px; }
+            .gender-toggle button { padding:5px 12px; font-size:12px; }
+            .status-bar { flex-direction:column; align-items:stretch; text-align:center; }
+            .status-bar .status-badge { align-self:center; }
+            .body-container { min-height:auto; flex-direction:column; align-items:center; }
+            .body-svg { max-width:150px; }
+            .camera-wrapper { width:120px; }
+            .action-buttons button { min-width:70px; font-size:12px; padding:8px 10px; }
+            .scan-progress .step { font-size:10px; padding:4px 6px; min-width:40px; }
+        }
+        /* loading indicator */
+        #loadingIndicator {
+            display: none;
+            color: #f1c40f;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        #loadingIndicator.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" role="main">
+        <header class="header">
+            <div class="header-left">
+                <div class="logo-icon">☪</div>
+                <div>
+                    <h1>aurat<span>scan</span></h1>
+                    <div class="sub">Smart Scan · MediaPipe + Heuristic</div>
+                </div>
+            </div>
+            <div class="header-right">
+                <span class="label">Viewing</span>
+                <div class="gender-toggle" role="group">
+                    <button id="genderFemale" class="active" data-gender="female">👩 Woman</button>
+                    <button id="genderMale" data-gender="male">👨 Man</button>
+                </div>
+            </div>
+        </header>
+        <div class="main-grid">
+            <section class="visual-panel">
+                <div class="panel-title">Live Scan & Heuristic</div>
+                <div class="body-container">
+                    <div>
+                        <svg class="body-svg" viewBox="0 0 200 380" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <ellipse cx="100" cy="34" rx="22" ry="26" class="figure-body" stroke="rgba(255,255,255,0.06)" />
+                            <ellipse cx="100" cy="34" rx="16" ry="18" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.03)" stroke-width="1" />
+                            <rect x="92" y="56" width="16" height="12" rx="3" class="figure-body" stroke="rgba(255,255,255,0.04)" />
+                            <path d="M68 68 L132 68 L136 166 L64 166 L68 68Z" class="figure-body" stroke="rgba(255,255,255,0.06)" />
+                            <path d="M68 68 L132 68 L136 166 L64 166 L68 68Z" class="aurat-area female-aurat" id="auratTorso" />
+                            <rect x="92" y="56" width="16" height="12" rx="3" class="aurat-area female-aurat" id="auratNeck" />
+                            <ellipse cx="100" cy="34" rx="22" ry="26" class="aurat-area female-aurat" id="auratHead" />
+                            <path d="M64 76 L44 130 L50 132 L68 86 L64 76Z" class="aurat-area female-aurat" id="auratArmL" />
+                            <path d="M136 76 L156 130 L150 132 L132 86 L136 76Z" class="aurat-area female-aurat" id="auratArmR" />
+                            <path d="M76 166 L72 270 L88 270 L90 166 L76 166Z" class="aurat-area female-aurat" id="auratLegL" />
+                            <path d="M124 166 L128 270 L112 270 L110 166 L124 166Z" class="aurat-area female-aurat" id="auratLegR" />
+                            <line x1="68" y1="96" x2="132" y2="96" stroke="rgba(52,152,219,0.1)" stroke-width="1.5" stroke-dasharray="4 4" />
+                            <line x1="74" y1="230" x2="126" y2="230" stroke="rgba(52,152,219,0.1)" stroke-width="1.5" stroke-dasharray="4 4" />
+                            <path d="M70 96 L130 96 L134 166 L128 230 L72 230 L66 166 L70 96Z" class="aurat-area male-aurat" id="auratMale" />
+                            <path d="M72 48 L128 48 L132 68 L116 80 L100 84 L84 80 L68 68 L72 48Z" class="clothing-item" id="clothHijab" />
+                            <path d="M64 76 L38 118 L42 122 L68 88 L64 76Z" class="clothing-item" id="clothSleeveL" />
+                            <path d="M136 76 L162 118 L158 122 L132 88 L136 76Z" class="clothing-item" id="clothSleeveR" />
+                            <path d="M66 68 L134 68 L138 164 L62 164 L66 68Z" class="clothing-item" id="clothTorso" />
+                            <path d="M74 164 L70 262 L88 262 L90 164 L74 164Z" class="clothing-item" id="clothPantsL" />
+                            <path d="M126 164 L130 262 L112 262 L110 164 L126 164Z" class="clothing-item" id="clothPantsR" />
+                            <text x="100" y="140" class="label-text" text-anchor="middle" id="labelAurat">AURAT</text>
+                            <text x="100" y="20" class="label-text" text-anchor="middle" fill="rgba(255,255,255,0.06)">MODESTY</text>
+                        </svg>
+                    </div>
+                    <div class="camera-wrapper hidden" id="cameraWrapper">
+                        <video id="cameraVideo" autoplay playsinline muted></video>
+                        <canvas id="segmentationCanvas"></canvas>
+                        <div class="camera-placeholder" id="cameraPlaceholder">
+                            <span class="big-icon">📸</span>
+                            Camera off
+                        </div>
+                    </div>
+                </div>
+                <div class="legend">
+                    <span class="legend-item"><span class="swatch aurat-f"></span> Female Aurat</span>
+                    <span class="legend-item"><span class="swatch aurat-m"></span> Male Aurat</span>
+                    <span class="legend-item"><span class="swatch heuristic-cover"></span> Heuristic: Covered</span>
+                    <span class="legend-item"><span class="swatch heuristic-expose"></span> Heuristic: Exposed</span>
+                </div>
+            </section>
+            <section class="controls-panel">
+                <div class="info-card">
+                    <div class="card-title">🧠 Smart Heuristic (MediaPipe)</div>
+                    <div class="description" id="infoText">
+                        <span id="scanInstruction">Camera off. Turn it on to see real‑time <span class="highlight-warn">skin‑tone estimate</span> for each area.</span>
+                        <div id="loadingIndicator">⏳ Loading MediaPipe model... (first time may take a few seconds)</div>
+                    </div>
+                    <div class="scan-progress" id="scanProgress">
+                        <span class="step" data-step="head">👤 Head</span>
+                        <span class="step" data-step="neck">📿 Neck</span>
+                        <span class="step" data-step="torso">👕 Torso</span>
+                        <span class="step" data-step="arms">💪 Arms</span>
+                        <span class="step" data-step="legs">👖 Legs</span>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button class="primary" id="startHeuristicBtn">▶ Start Heuristic</button>
+                    <button id="cameraToggleBtn">📸 Camera</button>
+                    <button id="resetBtn" class="danger">↺ Reset</button>
+                    <button class="secondary" id="toggleOverlayBtn">👁️ Overlay</button>
+                </div>
+                <div class="status-bar" id="statusBar">
+                    <span class="status-icon" id="statusIcon">🕌</span>
+                    <span class="status-text" id="statusText"><strong>Ready</strong> — Turn on camera and start heuristic.</span>
+                    <span class="status-badge" id="statusBadge">—</span>
+                </div>
+            </section>
+        </div>
+        <div class="footer-note">
+            <span class="arabic">﴿ وَقُل لِّلْمُؤْمِنَاتِ يَغْضُضْنَ مِنْ أَبْصَارِهِنَّ ﴾</span>
+            "And tell the believing women to lower their gaze..." — Qur'an 24:31
+            <br /><span style="opacity:0.3; font-size:11px;">Heuristic uses MediaPipe Selfie Segmentation + skin‑tone threshold · Not a substitute for human judgment</span>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+    <script>
+        (function() {
+            'use strict';
+
+            // ─── State ───
+            const state = {
+                gender: 'female',
+                scan: {
+                    head: false, neck: false, torso: false, arms: false, legs: false
+                },
+                cameraOn: false,
+                heuristicRunning: false,
+                heuristicResults: {
+                    head: null, neck: null, torso: null, arms: null, legs: null
+                },
+                overlayVisible: true,
+                modelLoaded: false,
+                modelLoading: false,
+            };
+
+            // ─── DOM refs ───
+            const genderFemale = document.getElementById('genderFemale');
+            const genderMale = document.getElementById('genderMale');
+            const scanInstruction = document.getElementById('scanInstruction');
+            const statusText = document.getElementById('statusText');
+            const statusIcon = document.getElementById('statusIcon');
+            const statusBadge = document.getElementById('statusBadge');
+            const startBtn = document.getElementById('startHeuristicBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const cameraToggleBtn = document.getElementById('cameraToggleBtn');
+            const toggleOverlayBtn = document.getElementById('toggleOverlayBtn');
+            const progressSteps = document.querySelectorAll('.step');
+            const cameraWrapper = document.getElementById('cameraWrapper');
+            const cameraVideo = document.getElementById('cameraVideo');
+            const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+            const segCanvas = document.getElementById('segmentationCanvas');
+            const ctx = segCanvas.getContext('2d');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+
+            // SVG elements
+            const auratTorso = document.getElementById('auratTorso');
+            const auratNeck = document.getElementById('auratNeck');
+            const auratHead = document.getElementById('auratHead');
+            const auratArmL = document.getElementById('auratArmL');
+            const auratArmR = document.getElementById('auratArmR');
+            const auratLegL = document.getElementById('auratLegL');
+            const auratLegR = document.getElementById('auratLegR');
+            const auratMale = document.getElementById('auratMale');
+            const labelAurat = document.getElementById('labelAurat');
+
+            let cameraStream = null;
+            let selfieSegmentation = null;
+            let animationId = null;
+            let frameCount = 0;
+
+            // ─── Part mapping ───
+            const partMap = {
+                head: [auratHead],
+                neck: [auratNeck],
+                torso: [auratTorso],
+                arms: [auratArmL, auratArmR],
+                legs: [auratLegL, auratLegR],
+            };
+            const partLabels = {
+                head: 'Head', neck: 'Neck', torso: 'Torso', arms: 'Arms', legs: 'Legs'
+            };
+            const maleParts = ['torso', 'legs'];
+
+            function getScanOrder() {
+                return state.gender === 'female' ? ['head', 'neck', 'torso', 'arms', 'legs'] : ['torso', 'legs'];
+            }
+
+            // ─── Update visuals ───
+            function updateVisuals() {
+                const isFemale = state.gender === 'female';
+                const femaleEls = [auratTorso, auratNeck, auratHead, auratArmL, auratArmR, auratLegL, auratLegR];
+                const maleEls = [auratMale];
+
+                femaleEls.forEach(el => {
+                    if (isFemale) {
+                        el.classList.add('visible');
+                        el.classList.remove('male-aurat');
+                    } else {
+                        el.classList.remove('visible');
+                        el.classList.add('male-aurat');
+                    }
+                });
+                maleEls.forEach(el => {
+                    if (!isFemale) {
+                        el.classList.add('visible');
+                        el.classList.add('male-aurat');
+                    } else {
+                        el.classList.remove('visible');
+                        el.classList.remove('male-aurat');
+                    }
+                });
+
+                const allParts = Object.keys(state.scan);
+                const activeParts = isFemale ? allParts : maleParts;
+                allParts.forEach(part => {
+                    const els = partMap[part] || [];
+                    const isScanned = state.scan[part] || false;
+                    const isActive = isFemale ? true : maleParts.includes(part);
+                    const heuristic = state.heuristicResults[part];
+
+                    els.forEach(el => {
+                        el.classList.remove('scanned-ok', 'heuristic-cover', 'heuristic-expose', 'heuristic-unknown', 'visible');
+                        if (isScanned && isActive) {
+                            el.classList.add('scanned-ok');
+                        } else if (isActive && state.heuristicRunning && heuristic) {
+                            if (heuristic === 'covered') el.classList.add('heuristic-cover');
+                            else if (heuristic === 'exposed') el.classList.add('heuristic-expose');
+                            else el.classList.add('heuristic-unknown');
+                        } else if (isActive) {
+                            el.classList.add('visible');
+                        }
+                    });
+                });
+
+                if (!isFemale) {
+                    const torsoDone = state.scan.torso || false;
+                    const legsDone = state.scan.legs || false;
+                    const heuristicTorso = state.heuristicResults.torso;
+                    const heuristicLegs = state.heuristicResults.legs;
+                    auratMale.classList.remove('scanned-ok', 'heuristic-cover', 'heuristic-expose', 'heuristic-unknown', 'visible');
+                    if (torsoDone && legsDone) {
+                        auratMale.classList.add('scanned-ok');
+                    } else if (state.heuristicRunning && (heuristicTorso || heuristicLegs)) {
+                        const bothCovered = (heuristicTorso === 'covered' || torsoDone) && (heuristicLegs === 'covered' || legsDone);
+                        const anyExposed = (heuristicTorso === 'exposed' && !torsoDone) || (heuristicLegs === 'exposed' && !legsDone);
+                        if (bothCovered && !anyExposed) auratMale.classList.add('heuristic-cover');
+                        else if (anyExposed) auratMale.classList.add('heuristic-expose');
+                        else auratMale.classList.add('heuristic-unknown');
+                    } else {
+                        auratMale.classList.add('visible');
+                    }
+                }
+
+                labelAurat.setAttribute('fill', isFemale ? 'rgba(231,76,60,0.5)' : 'rgba(52,152,219,0.5)');
+                updateStatus();
+                updateProgress();
+            }
+
+            function updateProgress() {
+                const order = getScanOrder();
+                progressSteps.forEach(el => {
+                    const part = el.dataset.step;
+                    const isActive = order.includes(part);
+                    const isDone = state.scan[part] || false;
+                    const heuristic = state.heuristicResults[part];
+
+                    el.classList.remove('active', 'done', 'fail', 'heuristic-cover', 'heuristic-expose');
+                    el.style.opacity = isActive ? '1' : '0.25';
+                    let label = partLabels[part] || part;
+                    if (!isActive) {
+                        el.textContent = '⏳ ' + label;
+                        return;
+                    }
+                    if (isDone) {
+                        el.classList.add('done');
+                        el.textContent = '✅ ' + label;
+                    } else if (state.heuristicRunning && heuristic) {
+                        el.classList.add(heuristic === 'covered' ? 'heuristic-cover' : 'heuristic-expose');
+                        const emoji = heuristic === 'covered' ? '🟢' : '🔴';
+                        el.textContent = emoji + ' ' + label;
+                    } else {
+                        el.textContent = '⏳ ' + label;
+                    }
+                });
+            }
+
+            function updateStatus() {
+                const order = getScanOrder();
+                const done = order.filter(p => state.scan[p]);
+                const total = order.length;
+                const progress = done.length;
+
+                let msg, icon, badge, badgeClass;
+                if (state.heuristicRunning) {
+                    const covered = order.filter(p => state.heuristicResults[p] === 'covered');
+                    const exposed = order.filter(p => state.heuristicResults[p] === 'exposed');
+                    const unknown = order.filter(p => state.heuristicResults[p] === null);
+                    let statusText = `🟢 ${covered.length} covered, 🔴 ${exposed.length} exposed`;
+                    if (unknown.length) statusText += `, ⚪ ${unknown.length} unknown`;
+                    msg = `🧠 Heuristic running: ${statusText}`;
+                    icon = '🧠';
+                    badge = `Heuristic`;
+                    badgeClass = 'heuristic';
+                } else if (progress === total && total > 0) {
+                    msg = '✅ All areas manually verified! You are compliant.';
+                    icon = '🌸';
+                    badge = 'Compliant ✓';
+                    badgeClass = 'compliant';
+                } else if (progress > 0) {
+                    msg = `🟡 ${progress}/${total} manually verified. ${total - progress} remaining.`;
+                    icon = '🟡';
+                    badge = `${progress}/${total}`;
+                    badgeClass = 'heuristic';
+                } else {
+                    msg = '🕌 Press <strong>"Start Heuristic"</strong> to get live skin‑tone hints, or click an area to manually verify.';
+                    icon = '🕌';
+                    badge = '—';
+                    badgeClass = '';
+                }
+                statusText.innerHTML = msg;
+                statusIcon.textContent = icon;
+                statusBadge.textContent = badge;
+                statusBadge.className = 'status-badge ' + badgeClass;
+
+                if (state.heuristicRunning) {
+                    scanInstruction.innerHTML = `🧠 Heuristic running — areas colored <span class="highlight-ok">green</span> (covered) or <span class="highlight-danger">red</span> (exposed) based on skin‑tone. Click areas to <strong>confirm</strong> or <strong>override</strong>.`;
+                } else if (progress === total && total > 0) {
+                    scanInstruction.innerHTML = '✅ <span class="highlight-ok">Manual verification complete!</span>';
+                } else {
+                    scanInstruction.innerHTML = 'Turn on camera, start heuristic, then click each area to confirm coverage.';
+                }
+            }
+
+            // ─── Skin detection helper ───
+            function isSkin(r, g, b) {
+                // Simple threshold
+                if (r < 60 || g < 40 || b < 20) return false;
+                const max = Math.max(r, g, b);
+                const min = Math.min(r, g, b);
+                const diff = max - min;
+                if (diff < 10) return false;
+                // Check if red is dominant
+                if (r <= g || g <= b) return false;
+                // Range
+                if (r > 250 || g > 200 || b > 170) return false;
+                return true;
+            }
+
+            // ─── Compute skin ratio in a zone from imageData ───
+            function computeSkinRatio(imageData, zone) {
+                const data = imageData.data;
+                const w = imageData.width;
+                const h = imageData.height;
+                let skinCount = 0;
+                let totalPixels = 0;
+                const x0 = Math.floor(zone.x);
+                const y0 = Math.floor(zone.y);
+                const x1 = Math.min(Math.floor(zone.x + zone.w), w);
+                const y1 = Math.min(Math.floor(zone.y + zone.h), h);
+                for (let row = y0; row < y1; row++) {
+                    for (let col = x0; col < x1; col++) {
+                        const idx = (row * w + col) * 4;
+                        const r = data[idx];
+                        const g = data[idx + 1];
+                        const b = data[idx + 2];
+                        totalPixels++;
+                        if (isSkin(r, g, b)) skinCount++;
+                    }
+                }
+                return totalPixels > 0 ? skinCount / totalPixels : 0;
+            }
+
+            // ─── Process frame directly (fallback if MediaPipe fails) ───
+            function processFrameDirect() {
+                if (!state.cameraOn || !state.heuristicRunning) return;
+                const video = cameraVideo;
+                if (video.readyState < 2) return;
+                const w = video.videoWidth || 320;
+                const h = video.videoHeight || 240;
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx2 = canvas.getContext('2d');
+                ctx2.drawImage(video, 0, 0, w, h);
+                const imageData = ctx2.getImageData(0, 0, w, h);
+
+                // Define zones (same proportions)
+                const zones = {
+                    head: { x: 0.3 * w, y: 0.05 * h, w: 0.4 * w, h: 0.2 * h },
+                    neck: { x: 0.35 * w, y: 0.25 * h, w: 0.3 * w, h: 0.1 * h },
+                    torso: { x: 0.25 * w, y: 0.35 * h, w: 0.5 * w, h: 0.25 * h },
+                    arms: { x: 0.0 * w, y: 0.35 * h, w: 0.2 * w, h: 0.35 * h },
+                    legs: { x: 0.25 * w, y: 0.6 * h, w: 0.5 * w, h: 0.35 * h },
+                };
+                // For arms, combine left and right
+                const armLeft = { x: 0.0 * w, y: 0.35 * h, w: 0.2 * w, h: 0.35 * h };
+                const armRight = { x: 0.8 * w, y: 0.35 * h, w: 0.2 * w, h: 0.35 * h };
+
+                const results = {};
+                const threshold = 0.12;
+                results.head = computeSkinRatio(imageData, zones.head) > threshold ? 'exposed' : 'covered';
+                results.neck = computeSkinRatio(imageData, zones.neck) > threshold ? 'exposed' : 'covered';
+                results.torso = computeSkinRatio(imageData, zones.torso) > threshold ? 'exposed' : 'covered';
+                const armsRatio = (computeSkinRatio(imageData, armLeft) + computeSkinRatio(imageData, armRight)) / 2;
+                results.arms = armsRatio > threshold ? 'exposed' : 'covered';
+                results.legs = computeSkinRatio(imageData, zones.legs) > threshold ? 'exposed' : 'covered';
+
+                // For male, only torso and legs
+                if (state.gender === 'male') {
+                    // ignore others
+                }
+                state.heuristicResults = results;
+                updateVisuals();
+            }
+
+            // ─── MediaPipe initialization ───
+            function initMediaPipe() {
+                if (selfieSegmentation) return;
+                if (state.modelLoading) return;
+                state.modelLoading = true;
+                loadingIndicator.classList.add('show');
+                try {
+                    selfieSegmentation = new SelfieSegmentation({
+                        locateFile: (file) => {
+                            return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
+                        }
+                    });
+
+                    selfieSegmentation.setOptions({
+                        modelSelection: 1,
+                    });
+
+                    selfieSegmentation.onResults((results) => {
+                        if (!state.cameraOn || !state.heuristicRunning) return;
+                        // Use the mask to refine skin detection
+                        // We'll combine mask and video frame
+                        const mask = results.segmentationMask;
+                        if (!mask) {
+                            // fallback to direct frame
+                            processFrameDirect();
+                            return;
+                        }
+                        // We'll use the mask to only consider pixels where mask > 0.5
+                        // But we already have the video frame; we'll draw video on canvas and use mask data
+                        const video = cameraVideo;
+                        if (video.readyState < 2) return;
+                        const w = mask.width;
+                        const h = mask.height;
+                        // Create a canvas for video frame
+                        const vidCanvas = document.createElement('canvas');
+                        vidCanvas.width = w;
+                        vidCanvas.height = h;
+                        const vidCtx = vidCanvas.getContext('2d');
+                        vidCtx.drawImage(video, 0, 0, w, h);
+                        const vidData = vidCtx.getImageData(0, 0, w, h);
+
+                        // Mask data is Float32Array, we threshold at 0.5
+                        const maskData = mask.data;
+
+                        // Define zones (relative to w,h)
+                        const zones = {
+                            head: { x: 0.3 * w, y: 0.05 * h, w: 0.4 * w, h: 0.2 * h },
+                            neck: { x: 0.35 * w, y: 0.25 * h, w: 0.3 * w, h: 0.1 * h },
+                            torso: { x: 0.25 * w, y: 0.35 * h, w: 0.5 * w, h: 0.25 * h },
+                            arms: { x: 0.0 * w, y: 0.35 * h, w: 0.2 * w, h: 0.35 * h },
+                            legs: { x: 0.25 * w, y: 0.6 * h, w: 0.5 * w, h: 0.35 * h },
+                        };
+                        const armLeft = { x: 0.0 * w, y: 0.35 * h, w: 0.2 * w, h: 0.35 * h };
+                        const armRight = { x: 0.8 * w, y: 0.35 * h, w: 0.2 * w, h: 0.35 * h };
+
+                        function computeSkinWithMask(zone) {
+                            let skinCount = 0;
+                            let totalPersonPixels = 0;
+                            const x0 = Math.floor(zone.x);
+                            const y0 = Math.floor(zone.y);
+                            const x1 = Math.min(Math.floor(zone.x + zone.w), w);
+                            const y1 = Math.min(Math.floor(zone.y + zone.h), h);
+                            for (let row = y0; row < y1; row++) {
+                                for (let col = x0; col < x1; col++) {
+                                    const idx = (row * w + col);
+                                    if (maskData[idx] > 0.5) {
+                                        totalPersonPixels++;
+                                        const vidIdx = idx * 4;
+                                        const r = vidData.data[vidIdx];
+                                        const g = vidData.data[vidIdx + 1];
+                                        const b = vidData.data[vidIdx + 2];
+                                        if (isSkin(r, g, b)) skinCount++;
+                                    }
+                                }
+                            }
+                            return totalPersonPixels > 0 ? skinCount / totalPersonPixels : 0;
+                        }
+
+                        const threshold = 0.12;
+                        const results = {};
+                        results.head = computeSkinWithMask(zones.head) > threshold ? 'exposed' : 'covered';
+                        results.neck = computeSkinWithMask(zones.neck) > threshold ? 'exposed' : 'covered';
+                        results.torso = computeSkinWithMask(zones.torso) > threshold ? 'exposed' : 'covered';
+                        const armsRatio = (computeSkinWithMask(armLeft) + computeSkinWithMask(armRight)) / 2;
+                        results.arms = armsRatio > threshold ? 'exposed' : 'covered';
+                        results.legs = computeSkinWithMask(zones.legs) > threshold ? 'exposed' : 'covered';
+
+                        state.heuristicResults = results;
+                        updateVisuals();
+                    });
+
+                    // Mark as loaded after first successful send? We'll just assume it's ready after a delay.
+                    state.modelLoaded = true;
+                    state.modelLoading = false;
+                    loadingIndicator.classList.remove('show');
+                    // Start sending frames if heuristic is running
+                    if (state.heuristicRunning) {
+                        sendFrames();
+                    }
+                } catch (e) {
+                    console.warn('MediaPipe init failed, using fallback:', e);
+                    state.modelLoading = false;
+                    loadingIndicator.classList.remove('show');
+                    // Fallback: use direct frame processing
+                    state.modelLoaded = false; // use fallback
+                    if (state.heuristicRunning) {
+                        sendFrames();
+                    }
+                }
+            }
+
+            // ─── Send frames to MediaPipe ───
+            function sendFrames() {
+                if (!state.heuristicRunning || !state.cameraOn) {
+                    if (animationId) {
+                        cancelAnimationFrame(animationId);
+                        animationId = null;
+                    }
+                    return;
+                }
+                if (selfieSegmentation && state.modelLoaded) {
+                    try {
+                        selfieSegmentation.send({ image: cameraVideo });
+                    } catch (e) {
+                        // fallback
+                        processFrameDirect();
+                    }
+                } else {
+                    // fallback
+                    processFrameDirect();
+                }
+                animationId = requestAnimationFrame(sendFrames);
+            }
+
+            // ─── Start heuristic ───
+            function startHeuristic() {
+                if (state.heuristicRunning) {
+                    state.heuristicRunning = false;
+                    startBtn.textContent = '▶ Start Heuristic';
+                    if (animationId) {
+                        cancelAnimationFrame(animationId);
+                        animationId = null;
+                    }
+                    Object.keys(state.heuristicResults).forEach(k => state.heuristicResults[k] = null);
+                    updateVisuals();
+                    return;
+                }
+                if (!state.cameraOn) {
+                    alert('Please turn on camera first.');
+                    return;
+                }
+                // Initialize MediaPipe if not done
+                if (!selfieSegmentation && !state.modelLoading) {
+                    initMediaPipe();
+                    // Wait a moment for init, then start sending
+                    setTimeout(() => {
+                        if (state.heuristicRunning) return; // already started?
+                        state.heuristicRunning = true;
+                        startBtn.textContent = '⏹ Stop Heuristic';
+                        // If MediaPipe not loaded, fallback will be used
+                        sendFrames();
+                        updateVisuals();
+                    }, 500);
+                    return;
+                }
+                state.heuristicRunning = true;
+                startBtn.textContent = '⏹ Stop Heuristic';
+                sendFrames();
+                updateVisuals();
+            }
+
+            // ─── Reset ───
+            function resetAll() {
+                state.heuristicRunning = false;
+                startBtn.textContent = '▶ Start Heuristic';
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+                Object.keys(state.scan).forEach(k => state.scan[k] = false);
+                Object.keys(state.heuristicResults).forEach(k => state.heuristicResults[k] = null);
+                progressSteps.forEach(el => {
+                    el.classList.remove('done', 'fail', 'active', 'heuristic-cover', 'heuristic-expose');
+                    el.textContent = '⏳ ' + (partLabels[el.dataset.step] || el.dataset.step);
+                });
+                updateVisuals();
+                scanInstruction.innerHTML = 'Reset. Turn on camera and start heuristic, or manually verify.';
+            }
+
+            // ─── Camera toggle ───
+            async function toggleCamera() {
+                if (state.cameraOn) {
+                    if (cameraStream) {
+                        cameraStream.getTracks().forEach(t => t.stop());
+                        cameraStream = null;
+                    }
+                    cameraVideo.srcObject = null;
+                    cameraWrapper.classList.add('hidden');
+                    cameraWrapper.classList.remove('active');
+                    cameraToggleBtn.textContent = '📸 Camera';
+                    state.cameraOn = false;
+                    if (state.heuristicRunning) startHeuristic();
+                    return;
+                }
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+                    cameraStream = stream;
+                    cameraVideo.srcObject = stream;
+                    cameraWrapper.classList.remove('hidden');
+                    cameraWrapper.classList.add('active');
+                    cameraToggleBtn.textContent = '⏹ Stop';
+                    state.cameraOn = true;
+                    cameraPlaceholder.style.display = 'none';
+                    // Init MediaPipe if not done
+                    if (!selfieSegmentation && !state.modelLoading) {
+                        initMediaPipe();
+                    }
+                } catch (err) {
+                    alert('Camera access denied.');
+                }
+            }
+
+            // ─── Toggle overlay ───
+            function toggleOverlay() {
+                state.overlayVisible = !state.overlayVisible;
+                segCanvas.style.display = state.overlayVisible ? 'block' : 'none';
+                toggleOverlayBtn.textContent = state.overlayVisible ? '👁️ Overlay' : '👁️ Hide Overlay';
+            }
+
+            // ─── Set gender ───
+            function setGender(gender) {
+                state.gender = gender;
+                genderFemale.classList.toggle('active', gender === 'female');
+                genderMale.classList.toggle('active', gender === 'male');
+                resetAll();
+                progressSteps.forEach(el => {
+                    const part = el.dataset.step;
+                    if (gender === 'male' && !maleParts.includes(part)) {
+                        el.style.display = 'none';
+                    } else {
+                        el.style.display = 'block';
+                    }
+                });
+            }
+
+            // ─── Manual toggle ───
+            function toggleManual(part) {
+                const isFemale = state.gender === 'female';
+                if (!isFemale && !maleParts.includes(part)) return;
+                state.scan[part] = !state.scan[part];
+                if (state.scan[part]) {
+                    state.heuristicResults[part] = null;
+                }
+                updateVisuals();
+            }
+
+            // ─── Event listeners ───
+            genderFemale.addEventListener('click', () => setGender('female'));
+            genderMale.addEventListener('click', () => setGender('male'));
+            startBtn.addEventListener('click', startHeuristic);
+            resetBtn.addEventListener('click', resetAll);
+            cameraToggleBtn.addEventListener('click', toggleCamera);
+            toggleOverlayBtn.addEventListener('click', toggleOverlay);
+
+            progressSteps.forEach(el => {
+                el.addEventListener('click', () => {
+                    const part = el.dataset.step;
+                    const order = getScanOrder();
+                    if (!order.includes(part)) return;
+                    toggleManual(part);
+                });
+            });
+
+            // ─── Keyboard shortcuts ───
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'f' || e.key === 'F') setGender('female');
+                if (e.key === 'm' || e.key === 'M') setGender('male');
+                if (e.key === 'c' || e.key === 'C') toggleCamera();
+                if (e.key === 'r' || e.key === 'R') resetAll();
+                if (e.key === 's' || e.key === 'S') startHeuristic();
+                if (e.key === 'o' || e.key === 'O') toggleOverlay();
+                const map = { '1': 'head', '2': 'neck', '3': 'torso', '4': 'arms', '5': 'legs' };
+                const part = map[e.key];
+                if (part) {
+                    const order = getScanOrder();
+                    if (order.includes(part)) {
+                        e.preventDefault();
+                        toggleManual(part);
+                    }
+                }
+            });
+
+            // ─── Init ───
+            setGender('female');
+            console.log('🕌 Aurat Smart Scan loaded. Keys: F/M gender, C camera, S heuristic, R reset, O overlay, 1-5 manual toggle.');
+            // Also, if camera is already on, we can init MediaPipe
+            // But we'll wait for user action.
+        })();
+    </script>
+</body>
+</html>

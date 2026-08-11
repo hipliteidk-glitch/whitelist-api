@@ -1,0 +1,392 @@
+{
+  "_readme": [
+    "Ready-to-use ZeroScript config for Termux on Android. No MCP, no Roblox.",
+    "Copy it over config.json:   cp config.termux.json config.json",
+    "",
+    "It gives the AI read/write access to ONE folder: ~/zs (created by",
+    "start-termux.sh). Change {path} defaults or add tools as you like.",
+    "To reach your real phone storage, run `termux-setup-storage` once, then",
+    "point cwd at /data/data/com.termux/files/home/storage/shared.",
+    "",
+    "Every 'run' is an argv LIST executed WITHOUT a shell, so an argument can",
+    "never start a second command. See NO-MCP.md.",
+    "",
+    "screenshot: needs the Termux:API APP (F-Droid) plus `pkg install termux-api`.",
+    "The image is only useful if the model can SEE images - on DeepSeek that",
+    "means selecting the Vision tab before starting the agent."
+  ],
+  "target": {
+    "id": "phone",
+    "kind": "generic",
+    "name": "my phone",
+    "short": "Phone",
+    "offline_hint": "Make sure the bridge is running in Termux (bash start-termux.sh)."
+  },
+  "servers": {
+    "phone": {
+      "type": "script",
+      "tools": [
+        {
+          "name": "list_files",
+          "description": "List the files in a folder inside the workspace. Use '.' for the top level.",
+          "params": {
+            "path": {
+              "type": "string",
+              "description": "folder, relative to the workspace",
+              "default": "."
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "ls",
+            "-la",
+            "{path}"
+          ]
+        },
+        {
+          "name": "read_file",
+          "description": "Show the full contents of a text file.",
+          "params": {
+            "path": {
+              "type": "string",
+              "description": "file to read",
+              "required": true
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "cat",
+            "{path}"
+          ]
+        },
+        {
+          "name": "write_file",
+          "description": "Create or overwrite a text file with the given content.",
+          "params": {
+            "path": {
+              "type": "string",
+              "description": "file to write",
+              "required": true
+            },
+            "content": {
+              "type": "string",
+              "description": "the full text to put in the file",
+              "required": true
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "python",
+            "-c",
+            "import sys,pathlib;p=pathlib.Path(sys.argv[1]);p.parent.mkdir(parents=True,exist_ok=True);p.write_text(sys.argv[2]);print(f'wrote {len(sys.argv[2])} chars to {p}')",
+            "{path}",
+            "{content}"
+          ]
+        },
+        {
+          "name": "append_file",
+          "description": "Append a line of text to the end of a file.",
+          "params": {
+            "path": {
+              "type": "string",
+              "description": "file to append to",
+              "required": true
+            },
+            "content": {
+              "type": "string",
+              "description": "text to append",
+              "required": true
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "python",
+            "-c",
+            "import sys,pathlib;p=pathlib.Path(sys.argv[1]);p.parent.mkdir(parents=True,exist_ok=True);f=p.open('a');f.write(sys.argv[2]+chr(10));f.close();print('appended to '+str(p))",
+            "{path}",
+            "{content}"
+          ]
+        },
+        {
+          "name": "search_text",
+          "description": "Search for a text pattern in the workspace and show matching lines with line numbers.",
+          "params": {
+            "pattern": {
+              "type": "string",
+              "description": "text to look for",
+              "required": true
+            },
+            "path": {
+              "type": "string",
+              "description": "folder or file to search; defaults to everything",
+              "default": "."
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "grep",
+            "-rn",
+            "--",
+            "{pattern}",
+            "{path}"
+          ]
+        },
+        {
+          "name": "delete_file",
+          "description": "Delete ONE file. Destructive - confirm with the user first.",
+          "params": {
+            "path": {
+              "type": "string",
+              "description": "file to delete",
+              "required": true
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "rm",
+            "-v",
+            "--",
+            "{path}"
+          ]
+        },
+        {
+          "name": "phone_status",
+          "description": "Show free space and the current date on the phone.",
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "sh",
+            "-c",
+            "date; echo; df -h ."
+          ]
+        },
+        {
+          "name": "screenshot",
+          "description": "Take a screenshot of the phone screen and show it. Tries Termux:API, then Android's built-in screencap. Only works if the assistant can see images (DeepSeek Vision model).",
+          "returns": "image",
+          "image_path": "{ZS_WORKSPACE}/.zs-screenshot.png",
+          "timeout": 45,
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "sh",
+            "-c",
+            "out=\"$ZS_WORKSPACE/.zs-screenshot.png\"; rm -f \"$out\"; if command -v termux-screenshot >/dev/null 2>&1; then   termux-screenshot \"$out\" >/dev/null 2>&1; fi; if [ ! -s \"$out\" ] && command -v screencap >/dev/null 2>&1; then   screencap -p \"$out\" >/dev/null 2>&1; fi; if [ ! -s \"$out\" ]; then   echo \"Could not capture the screen. Android blocks screenshots from a plain shell unless Termux:API is installed (Termux:API app from F-Droid + 'pkg install termux-api'), or the device is rooted. If you already have a screenshot saved, use show_image with its path instead.\" >&2; exit 1; fi; echo \"screen captured\""
+          ]
+        },
+        {
+          "name": "show_image",
+          "description": "Show an image file that already exists on the phone (png/jpg), so the assistant can look at it. Give the path, e.g. screenshot.png. Requires a model that can see images (DeepSeek Vision).",
+          "params": {
+            "path": {
+              "type": "string",
+              "description": "image file, relative to the workspace",
+              "required": true
+            }
+          },
+          "returns": "image",
+          "image_path": "{path}",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 30,
+          "run": [
+            "sh",
+            "-c",
+            "f=\"$1\"; case \"$f\" in /*) : ;; *) f=\"$ZS_WORKSPACE/$f\" ;; esac; [ -s \"$f\" ] || { echo \"No such image: $f\" >&2; exit 1; }; echo \"showing $f\"",
+            "sh",
+            "{path}"
+          ]
+        },
+        {
+          "name": "generate_model",
+          "description": "Generate a 3D model (cube, sphere, house) and save as OBJ.",
+          "params": {
+            "type": {
+              "type": "string",
+              "enum": ["cube", "sphere", "house"],
+              "required": true,
+              "description": "Shape to generate"
+            },
+            "size": {
+              "type": "number",
+              "default": 1.0,
+              "description": "Size/radius for cube/sphere"
+            },
+            "segments": {
+              "type": "integer",
+              "default": 16,
+              "description": "Segments for sphere"
+            },
+            "width": {
+              "type": "number",
+              "default": 2.0,
+              "description": "House width"
+            },
+            "depth": {
+              "type": "number",
+              "default": 2.0,
+              "description": "House depth"
+            },
+            "height": {
+              "type": "number",
+              "default": 1.5,
+              "description": "House height"
+            },
+            "roof_height": {
+              "type": "number",
+              "default": 1.0,
+              "description": "House roof height"
+            },
+            "output": {
+              "type": "string",
+              "default": "model.obj",
+              "description": "Output filename"
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "python3",
+            "generate_model.py",
+            "--type", "{type}",
+            "--size", "{size}",
+            "--segments", "{segments}",
+            "--width", "{width}",
+            "--depth", "{depth}",
+            "--height", "{height}",
+            "--roof_height", "{roof_height}",
+            "--output", "{output}"
+          ]
+        },
+        {
+          "name": "run_shell",
+          "description": "Run a shell command in the workspace.",
+          "params": {
+            "cmd": {
+              "type": "string",
+              "description": "command to run",
+              "required": true
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 60,
+          "run": [
+            "sh",
+            "-c",
+            "{cmd}"
+          ]
+        },
+        {
+          "name": "update_zeroscript",
+          "description": "Update the ZeroScript-Free repository (git pull) and show the latest commit.",
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "bash",
+            "ZeroScript-Free/update.sh"
+          ]
+        }
+      ]
+    },
+    "railway": {
+      "type": "script",
+      "tools": [
+        {
+          "name": "railway_login",
+          "description": "Begin a Railway login. Returns a pairing code and URL for the user to open in a browser; it does NOT wait. After the user confirms, call railway_login_status.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 60,
+          "run": [
+            "sh",
+            "{ZS_APP_DIR}/railway-login.sh",
+            "start"
+          ]
+        },
+        {
+          "name": "railway_login_status",
+          "description": "Check whether the Railway login has completed. Reports the account name only, never a token.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 45,
+          "run": [
+            "sh",
+            "{ZS_APP_DIR}/railway-login.sh",
+            "status"
+          ]
+        },
+        {
+          "name": "railway_login_cancel",
+          "description": "Abandon a pending Railway login.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 30,
+          "run": [
+            "sh",
+            "{ZS_APP_DIR}/railway-login.sh",
+            "cancel"
+          ]
+        },
+        {
+          "name": "railway_whoami",
+          "description": "Show which Railway account is currently authenticated.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 45,
+          "run": [
+            "railway",
+            "whoami"
+          ]
+        },
+        {
+          "name": "railway_status",
+          "description": "Show the linked Railway project and its services.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 60,
+          "run": [
+            "railway",
+            "status"
+          ]
+        },
+        {
+          "name": "railway_list",
+          "description": "List the Railway projects on this account.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 60,
+          "run": [
+            "railway",
+            "list"
+          ]
+        },
+        {
+          "name": "railway_logs",
+          "description": "Show recent deployment logs for the linked service.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 90,
+          "run": [
+            "railway",
+            "logs"
+          ]
+        },
+        {
+          "name": "railway_variables",
+          "description": "List the environment variables of the linked service. Values are shown, so avoid this if secrets are set.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 60,
+          "run": [
+            "railway",
+            "variables"
+          ]
+        },
+        {
+          "name": "railway_up",
+          "description": "Deploy the current workspace folder to Railway. Confirm with the user before using this.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 900,
+          "run": [
+            "railway",
+            "up",
+            "--detach"
+          ]
+        }
+      ]
+    }
+  },
+  "mcpServers": {
+    "model": {
+      "url": "http://localhost:5000/mcp",
+      "transport": "http"
+    }
+  }
+}

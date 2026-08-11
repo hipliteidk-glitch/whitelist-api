@@ -1,0 +1,107 @@
+{
+  "_readme": [
+    "Railway tools for ZeroScript, including a WORKING browserless login.",
+    "",
+    "   cp config.railway.json config.json",
+    "   ZS_WORKSPACE=~/myproject bash start-termux.sh -b",
+    "",
+    "WHY railway_login WORKS HERE",
+    "`railway login --browserless` prints a pairing code then BLOCKS until you",
+    "confirm in a browser. Called directly by a tool it hangs or is killed with",
+    "no output - that is the empty output you saw. railway-login.sh runs it in",
+    "the background, captures the pairing code, prints it and returns. You then",
+    "confirm in a browser and call railway_login_status.",
+    "",
+    "Nothing here bypasses the browser step - that is not possible, and any tool",
+    "claiming otherwise would need your password. It only stops the blocking",
+    "call from breaking automation.",
+    "",
+    "PREFER A TOKEN FOR AUTOMATION",
+    "For CI or an always-on deploy, skip login entirely: set RAILWAY_TOKEN",
+    "(project) or RAILWAY_API_TOKEN (account) in the environment before starting",
+    "the bridge, and the CLI authenticates with no prompt. Put it in the",
+    "environment - never paste a token into a chat.",
+    "",
+    "Every 'run' is an argv LIST executed WITHOUT a shell, so an argument cannot",
+    "start a second command. There is no generic 'shell' tool by design."
+  ],
+
+  "target": {
+    "id": "railway",
+    "kind": "generic",
+    "name": "Railway",
+    "short": "Railway",
+    "offline_hint": "Install the Railway CLI (npm i -g @railway/cli), then restart the bridge."
+  },
+
+  "servers": {
+    "railway": {
+      "type": "script",
+      "tools": [
+        {
+          "name": "railway_login",
+          "description": "Begin a Railway login. Returns a pairing code and URL for the user to open in a browser; it does NOT wait. After the user confirms, call railway_login_status.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 60,
+          "run": ["sh", "{ZS_APP_DIR}/railway-login.sh", "start"]
+        },
+        {
+          "name": "railway_login_status",
+          "description": "Check whether the Railway login has completed. Reports the account name only, never a token.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 45,
+          "run": ["sh", "{ZS_APP_DIR}/railway-login.sh", "status"]
+        },
+        {
+          "name": "railway_login_cancel",
+          "description": "Abandon a pending Railway login.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 30,
+          "run": ["sh", "{ZS_APP_DIR}/railway-login.sh", "cancel"]
+        },
+        {
+          "name": "railway_whoami",
+          "description": "Show which Railway account is currently authenticated.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 45,
+          "run": ["railway", "whoami"]
+        },
+        {
+          "name": "railway_status",
+          "description": "Show the linked Railway project and its services.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 60,
+          "run": ["railway", "status"]
+        },
+        {
+          "name": "railway_list",
+          "description": "List the Railway projects on this account.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 60,
+          "run": ["railway", "list"]
+        },
+        {
+          "name": "railway_logs",
+          "description": "Show recent deployment logs for the linked service.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 90,
+          "run": ["railway", "logs"]
+        },
+        {
+          "name": "railway_variables",
+          "description": "List the environment variables of the linked service. Values are shown, so avoid this if secrets are set.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 60,
+          "run": ["railway", "variables"]
+        },
+        {
+          "name": "railway_up",
+          "description": "Deploy the current workspace folder to Railway. Confirm with the user before using this.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 900,
+          "run": ["railway", "up", "--detach"]
+        }
+      ]
+    }
+  }
+}

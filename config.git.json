@@ -1,0 +1,188 @@
+{
+  "_readme": [
+    "Give the AI git tools, with NO MCP server needed.",
+    "",
+    "   cp config.git.json config.json && bash start-termux.sh -b",
+    "",
+    "IMPORTANT - the AI does NOT log in. It cannot: authenticating means handling",
+    "your credentials, and an AI reading your token in a chat window is exactly",
+    "how tokens leak. YOU authenticate once (see AI-GIT.md), git stores the",
+    "credential, and these tools then work because git picks it up.",
+    "",
+    "ZS_WORKSPACE must point at your git repo:",
+    "   ZS_WORKSPACE=~/myrepo bash start-termux.sh -b",
+    "",
+    "Safety notes:",
+    "  - Every 'run' is an argv LIST executed WITHOUT a shell, so an argument",
+    "    cannot start a second command.",
+    "  - There is deliberately NO force-push, NO reset --hard, NO clean, and no",
+    "    tool that prints credentials or remote URLs (which can embed a token).",
+    "  - git_push is the only tool that changes anything remote. Delete it if you",
+    "    want the AI to be able to commit locally but never publish."
+  ],
+  "target": {
+    "id": "git",
+    "kind": "generic",
+    "name": "my git repo",
+    "short": "Git",
+    "offline_hint": "Point ZS_WORKSPACE at a git repository and restart the bridge."
+  },
+  "servers": {
+    "git": {
+      "type": "script",
+      "tools": [
+        {
+          "name": "git_status",
+          "description": "Show which files changed, staged and unstaged, plus the current branch.",
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "git",
+            "status",
+            "--short",
+            "--branch"
+          ]
+        },
+        {
+          "name": "git_log",
+          "description": "Show recent commits, most recent first.",
+          "params": {
+            "count": {
+              "type": "string",
+              "description": "how many commits",
+              "default": "15"
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "git",
+            "log",
+            "--oneline",
+            "--decorate",
+            "-n",
+            "{count}"
+          ]
+        },
+        {
+          "name": "git_diff",
+          "description": "Show unstaged changes. Pass staged=--staged to see staged ones instead.",
+          "params": {
+            "staged": {
+              "type": "string",
+              "description": "pass '--staged' for staged changes",
+              "default": "--"
+            },
+            "path": {
+              "type": "string",
+              "description": "limit to one file or folder",
+              "default": "."
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "git",
+            "diff",
+            "{staged}",
+            "{path}"
+          ]
+        },
+        {
+          "name": "git_show",
+          "description": "Show one commit in full, including its diff.",
+          "params": {
+            "commit": {
+              "type": "string",
+              "description": "commit hash or ref",
+              "default": "HEAD"
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "git",
+            "show",
+            "--stat",
+            "--patch",
+            "{commit}"
+          ]
+        },
+        {
+          "name": "git_branch",
+          "description": "List local branches and show which one is checked out.",
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "git",
+            "branch",
+            "--list",
+            "-vv"
+          ]
+        },
+        {
+          "name": "git_add",
+          "description": "Stage a file or folder for the next commit.",
+          "params": {
+            "path": {
+              "type": "string",
+              "description": "file or folder to stage",
+              "required": true
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "git",
+            "add",
+            "--",
+            "{path}"
+          ]
+        },
+        {
+          "name": "git_commit",
+          "description": "Commit the staged changes with a message. Stage files with git_add first.",
+          "params": {
+            "message": {
+              "type": "string",
+              "description": "commit message",
+              "required": true
+            }
+          },
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "git",
+            "commit",
+            "-m",
+            "{message}"
+          ]
+        },
+        {
+          "name": "git_pull",
+          "description": "Fetch and merge the latest changes from the remote.",
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "git",
+            "pull",
+            "--ff-only"
+          ]
+        },
+        {
+          "name": "git_push",
+          "description": "Publish local commits to the remote. Confirm with the user before using this.",
+          "cwd": "{ZS_WORKSPACE}",
+          "timeout": 120,
+          "run": [
+            "git",
+            "push"
+          ]
+        },
+        {
+          "name": "git_auth_check",
+          "description": "Check whether git can authenticate to the remote. Reports the account name only, never the token.",
+          "timeout": 45,
+          "cwd": "{ZS_WORKSPACE}",
+          "run": [
+            "sh",
+            "-c",
+            "if git ls-remote origin >/dev/null 2>&1; then echo 'authenticated: git can reach origin'; else echo 'NOT authenticated (or no origin): see AI-GIT.md to sign in once'; fi"
+          ]
+        }
+      ]
+    }
+  }
+}

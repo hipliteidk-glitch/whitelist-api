@@ -1,0 +1,41 @@
+{
+  "_readme": [
+    "Termux config that uses a REAL MCP server (not the no-MCP script tools).",
+    "",
+    "Needs Node:   pkg install -y nodejs",
+    "Then:         cp config.termux-mcp.json config.json && bash start-termux.sh",
+    "",
+    "The first launch downloads the server via npx and can take a few minutes on",
+    "a phone; the bridge waits. Later launches are fast (npm caches it).",
+    "",
+    "IMPORTANT: replace the last argument below with the folder you want the AI",
+    "to have access to. The filesystem server can ONLY touch that folder.",
+    "  - Termux home:     /data/data/com.termux/files/home/zs",
+    "  - Shared storage:  /data/data/com.termux/files/home/storage/shared",
+    "    (run `termux-setup-storage` once first to grant permission)",
+    "",
+    "Verified working: this server advertises 14 tools (read_text_file,",
+    "write_file, edit_file, list_directory, search_files, ...).",
+    "",
+    "Prefer no MCP at all? Use config.termux.json instead - see NO-MCP.md."
+  ],
+
+  "target": {
+    "id": "files",
+    "kind": "generic",
+    "name": "my phone files",
+    "short": "Files",
+    "offline_hint": "Install Node in Termux with `pkg install -y nodejs`, then restart the bridge."
+  },
+
+  "mcpServers": {
+    "files": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/data/data/com.termux/files/home/zs"
+      ]
+    }
+  }
+}

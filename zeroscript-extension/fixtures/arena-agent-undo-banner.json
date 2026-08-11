@@ -1,0 +1,25 @@
+{
+  "capturedAt": "2026-08-05T12:14:28.406Z",
+  "url": "https://arena.ai/agent/019fd1d8-6142-7791-987f-23678e851764",
+  "provider": "arena-agent",
+  "extensionVersion": "1.4.9",
+  "generating": false,
+  "_note": "Arena's 'Do you want to undo the last turn?' banner reuses div.flex.flex-col.gap-2 but is NOT inside a px-3 role wrapper. It was counted as the newest assistant turn, so the parser read the banner instead of the reply.",
+  "turns": [
+    {
+      "role": "user",
+      "chain": [],
+      "html": "<div class=\"px-3 text-text-primary body-base py-2\"><div class=\"flex flex-col gap-2 zs-hidden\" data-zs=\"sys\"><div class=\"prose prose-pre:bg-transparent prose-pre:p-0 text-wrap break-words prose-base body-base\"><p>\u27e6ZS-SYS\u27e7</p></div></div></div>"
+    },
+    {
+      "role": "assistant",
+      "chain": [],
+      "html": "<div class=\"px-3 pb-3\"><div class=\"flex flex-col gap-2\"><div class=\"prose prose-pre:bg-transparent prose-pre:p-0 text-wrap break-words prose-base body-base\"><pre><div class=\"not-prose\" data-code-block=\"true\"><pre class=\"shiki\"><code>{\"command\":\"list_commands\"}</code></pre></div></pre></div></div></div>"
+    },
+    {
+      "role": "chrome",
+      "chain": [],
+      "html": "<div class=\"px-4 pb-6 md:pb-4\"><div class=\"relative\"><div class=\"flex w-full flex-col items-center gap-2 md:hidden\"><span>Do you want to undo the last turn?</span><button>Undo</button></div></div></div>"
+    }
+  ]
+}

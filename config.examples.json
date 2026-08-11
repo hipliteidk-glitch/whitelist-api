@@ -1,0 +1,152 @@
+{
+  "_comment": [
+    "Example TARGET profiles for ZeroScript. Copy ONE of the blocks below into",
+    "config.json (replacing its contents) to point ZeroScript at something other",
+    "than Roblox Studio. The default config.json has no 'target' key at all,",
+    "which means the Roblox profile - so existing installs are unaffected.",
+    "",
+    "Fields:",
+    "  id            - must match a key in mcpServers; this is the PRIMARY server",
+    "  kind          - 'roblox' enables the Windows/StudioMCP supervision.",
+    "                  Use anything else (e.g. 'generic') for a normal MCP server.",
+    "  name / short  - display names used in the UI and in the model's prompt",
+    "  offline_hint  - one sentence telling the user how to bring the target up",
+    "  probe         - OPTIONAL liveness check. Omit it (or set {}) and readiness",
+    "                  is inferred from the server being alive and advertising",
+    "                  tools. 'tool' must be a side-effect-free, no-argument tool.",
+    "                  'state_tool' + 'not_ready_markers' additionally detect a",
+    "                  target that is attached but not usable."
+  ],
+  "example_blender": {
+    "target": {
+      "id": "blender",
+      "kind": "generic",
+      "name": "Blender",
+      "short": "Blender",
+      "offline_hint": "Open Blender and make sure its MCP add-on is enabled."
+    },
+    "mcpServers": {
+      "blender": {
+        "command": "uvx",
+        "args": [
+          "blender-mcp"
+        ]
+      }
+    }
+  },
+  "example_filesystem": {
+    "target": {
+      "id": "files",
+      "kind": "generic",
+      "name": "your project folder",
+      "short": "Files",
+      "offline_hint": "Check that the filesystem MCP server command is installed and on PATH."
+    },
+    "mcpServers": {
+      "files": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-filesystem",
+          "/path/to/your/project"
+        ]
+      }
+    }
+  },
+  "example_with_probe": {
+    "target": {
+      "id": "notebook",
+      "kind": "generic",
+      "name": "Notebook",
+      "short": "Notebook",
+      "offline_hint": "Start the notebook app so the bridge can reach it.",
+      "probe": {
+        "tool": "notebook_status",
+        "state_tool": "notebook_status",
+        "not_ready_markers": [
+          "not ready",
+          "no document open"
+        ]
+      }
+    },
+    "mcpServers": {
+      "notebook": {
+        "command": "python",
+        "args": [
+          "my_notebook_mcp.py"
+        ]
+      }
+    }
+  },
+  "example_roblox_explicit": {
+    "target": {
+      "id": "roblox",
+      "kind": "roblox",
+      "name": "Roblox Studio",
+      "short": "Roblox"
+    },
+    "mcpServers": {
+      "roblox": {
+        "command": "launch_studio_mcp.py",
+        "args": []
+      }
+    }
+  },
+  "example_no_mcp_shell": {
+    "_note": "No MCP at all: tools are plain commands. See NO-MCP.md.",
+    "target": {
+      "id": "shell",
+      "kind": "generic",
+      "name": "my computer",
+      "short": "Shell",
+      "offline_hint": "Check that the commands in config.json exist on this machine."
+    },
+    "servers": {
+      "shell": {
+        "type": "script",
+        "tools": [
+          {
+            "name": "list_files",
+            "description": "List the files in a folder.",
+            "params": {
+              "path": {
+                "description": "folder to list",
+                "required": true
+              }
+            },
+            "run": [
+              "ls",
+              "-la",
+              "{path}"
+            ]
+          },
+          {
+            "name": "read_file",
+            "description": "Show the contents of a file.",
+            "params": {
+              "path": "file to read"
+            },
+            "run": [
+              "cat",
+              "{path}"
+            ]
+          },
+          {
+            "name": "search_text",
+            "description": "Search for a pattern in a folder.",
+            "params": {
+              "pattern": "text to find",
+              "path": "folder to search"
+            },
+            "run": [
+              "grep",
+              "-rn",
+              "{pattern}",
+              "{path}"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

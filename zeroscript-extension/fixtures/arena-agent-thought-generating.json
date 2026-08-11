@@ -1,0 +1,37 @@
+{
+  "capturedAt": "2026-08-05T09:23:06.446Z",
+  "url": "https://arena.ai/agent/019fd139-39e1-7595-96b2-684bc93b8f58",
+  "provider": "arena-agent",
+  "extensionVersion": "1.4.9",
+  "generating": true,
+  "turns": [
+    {
+      "role": "user",
+      "chain": [
+        {
+          "tag": "DIV",
+          "cls": "flex flex-col gap-2"
+        },
+        {
+          "tag": "DIV",
+          "cls": "px-3 text-text-primary body-base py-2"
+        }
+      ],
+      "html": "<div class=\"px-3 text-text-primary body-base py-2\"><div class=\"flex flex-col gap-2\"><div class=\"prose prose-pre:bg-transparent prose-pre:p-0 text-wrap break-words prose-base body-base\"><p>O</p></div></div></div>"
+    },
+    {
+      "role": "assistant",
+      "chain": [
+        {
+          "tag": "DIV",
+          "cls": "flex flex-col gap-2"
+        },
+        {
+          "tag": "DIV",
+          "cls": "px-3 pb-3"
+        }
+      ],
+      "html": "<div class=\"px-3 pb-3\"><div class=\"flex flex-col gap-2\"><div data-state=\"closed\" class=\"not-prose\"><button type=\"button\"><p class=\"leading-[normal]\">Thought for 2 seconds</p></button></div><div class=\"prose prose-pre:bg-transparent prose-pre:p-0 text-wrap break-words prose-base body-base\"><p>It looks like your message may have been sent by accident.</p></div></div></div>"
+    }
+  ]
+}
