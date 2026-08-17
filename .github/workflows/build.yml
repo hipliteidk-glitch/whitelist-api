@@ -9,11 +9,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code (without submodules)
-        uses: actions/checkout@v4
-        with:
-          submodules: false
-          fetch-depth: 1
+      - name: Checkout code (manual, no submodules)
+        run: |
+          git clone --depth 1 --single-branch --branch main https://github.com/hipliteidk-glitch/whitelist-api.git .
+          rm -rf .git
+          # Now we have the code without any submodule baggage
 
       - name: Set up Python
         uses: actions/setup-python@v5
