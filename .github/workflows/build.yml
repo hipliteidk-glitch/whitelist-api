@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK with Docker
 
 on:
   push:
@@ -14,30 +14,10 @@ jobs:
         with:
           submodules: false
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install system dependencies
+      - name: Build with Buildozer in Docker
         run: |
-          sudo apt update
-          sudo apt install -y openjdk-17-jdk unzip zip \
-            autoconf automake libtool autoconf-archive pkg-config build-essential
-
-      - name: Install Python dependencies
-        run: |
-          pip install buildozer Cython
-
-      - name: Build APK
-        env:
-          ACLOCAL_PATH: /usr/share/aclocal:/usr/share/aclocal-1.16
-        run: |
-          cd anime_alert
-          buildozer android debug --verbose
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: anime-alert-apk
-          path: anime_alert/bin/*.apk
+          docker run --rm \
+            -v ${{ github.workspace }}:/home/user/hostcwd \
+            -w /home/user/hostcwd/anime_alert \
+            kivy/buildozer \
+            buildozer android debug
