@@ -3,10 +3,54 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:gravity="center">
+    android:padding="16dp">
+
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Anime Alert is running in the background."
-        android:textSize="20sp" />
+        android:text="Anime Alert"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_gravity="center" />
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Status: Running"
+        android:layout_marginTop="8dp" />
+
+    <TextView
+        android:id="@+id/lastCheckText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Last check: Never"
+        android:layout_marginTop="4dp" />
+
+    <Button
+        android:id="@+id/checkNowButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Check Now"
+        android:layout_marginTop="16dp" />
+
+    <Button
+        android:id="@+id/addAnimeButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Add Anime"
+        android:layout_marginTop="8dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tracked Anime:"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/animeList"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 </LinearLayout>
