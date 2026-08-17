@@ -1,4 +1,4 @@
-name: Build Android APK with Gradle
+name: Build APK
 
 on:
   push:
@@ -9,20 +9,27 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code (manual, no submodules)
+        run: |
+          git clone --depth 1 --single-branch --branch main https://github.com/hipliteidk-glitch/whitelist-api.git .
+          rm -rf .git
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.4
+
       - name: Build APK
         run: |
           cd AnimeAlertJava
           gradle assembleDebug
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
