@@ -23,13 +23,15 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y openjdk-17-jdk unzip zip \
-            autoconf automake libtool pkg-config build-essential
+            autoconf automake libtool autoconf-archive pkg-config build-essential
 
       - name: Install Python dependencies
         run: |
           pip install buildozer Cython
 
       - name: Build APK
+        env:
+          ACLOCAL_PATH: /usr/share/aclocal:/usr/share/aclocal-1.16
         run: |
           cd anime_alert
           buildozer android debug --verbose
