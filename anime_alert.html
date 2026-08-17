@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anime Alert</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background: #16213e;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        h1 { text-align: center; color: #e94560; margin-bottom: 8px; }
+        .status {
+            display: flex;
+            justify-content: space-between;
+            background: #0f3460;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+        .status .label { color: #888; }
+        .status .value { font-weight: bold; }
+        .status .value.running { color: #4caf50; }
+        .status .value.checking { color: #ff9800; }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-check { background: #4caf50; color: #fff; }
+        .btn-check:hover { background: #388e3c; }
+        .btn-add { background: #e94560; color: #fff; }
+        .btn-add:hover { background: #c62840; }
+        .btn-add:disabled { opacity: 0.5; cursor: not-allowed; }
+        .anime-list {
+            margin-top: 8px;
+            background: #0f3460;
+            border-radius: 12px;
+            padding: 8px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .anime-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid #1a1a3e;
+        }
+        .anime-item:last-child { border-bottom: none; }
+        .anime-item .name { font-size: 1rem; }
+        .anime-item .remove {
+            background: none;
+            border: none;
+            color: #e94560;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .anime-item .remove:hover { background: rgba(233,69,96,0.2); }
+        .empty-msg { text-align: center; color: #666; padding: 24px 0; }
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.4s;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .toast.show { opacity: 1; }
+        .toast.success { background: #2e7d32; }
+        .toast.error { background: #c62828; }
+        .footer {
+            margin-top: 16px;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #666;
+        }
+        @media (max-width: 480px) {
+            .container { padding: 16px; }
+            .btn-group { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📺 Anime Alert</h1>
+    <div class="status">
+        <span class="label">Status</span>
+        <span class="value running" id="statusText">● Idle</span>
+    </div>
+    <div class="status">
+        <span class="label">Last check</span>
+        <span class="value" id="lastCheckText">Never</span>
+    </div>
+    <div class="btn-group">
+        <button class="btn-check" id="checkBtn">🔍 Check Now</button>
+        <button class="btn-add" id="addBtn">➕ Add Anime</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin:8px 4px 4px 4px;">
+        <span style="font-weight:bold;font-size:0.9rem;">Tracked Anime</span>
+        <span style="font-size:0.8rem;color:#888;" id="countLabel">0</span>
+    </div>
+    <div class="anime-list" id="animeList">
+        <div class="empty-msg">No anime added yet. Tap "Add Anime".</div>
+    </div>
+    <div class="footer">Powered by Jikan API</div>
+</div>
+<div id="toast" class="toast"></div>
+<script>
+    // ---------- State ----------
+    let animeNames = [];
+    let isChecking = false;
+
+    // DOM refs
+    const statusText = document.getElementById('statusText');
+    const lastCheckText = document.getElementById('lastCheckText');
+    const animeListEl = document.getElementById('animeList');
+    const countLabel = document.getElementById('countLabel');
+    const checkBtn = document.getElementById('checkBtn');
+    const addBtn = document.getElementById('addBtn');
+    const toast = document.getElementById('toast');
+
+    // ---------- Notification bridge ----------
+    function sendNotification(message) {
+        if (typeof Android !== 'undefined' && Android.showNotification) {
+            Android.showNotification(message);
+            console.log('Android notification sent:', message);
+        } else if (Notification.permission === 'granted') {
+            new Notification('New Anime Episode!', { body: message });
+            console.log('Browser notification sent:', message);
+        } else {
+            console.log('Notification not shown (no permission):', message);
+        }
+    }
+
+    // ---------- Load from localStorage ----------
+    function loadData() {
+        const saved = localStorage.getItem('animeAlertList');
+        if (saved) {
+            try { animeNames = JSON.parse(saved); } catch(e) { animeNames = []; }
+        }
+        if (animeNames.length === 0) {
+            animeNames = ['One Piece', 'Demon Slayer', 'Attack on Titan'];
+            saveData();
+        }
+    }
+
+    function saveData() {
+        localStorage.setItem('animeAlertList', JSON.stringify(animeNames));
+        renderList();
+    }
+
+    // ---------- Render ----------
+    function renderList() {
+        if (animeNames.length === 0) {
+            animeListEl.innerHTML = `<div class="empty-msg">No anime added yet. Tap "Add Anime".</div>`;
+            countLabel.textContent = '0';
+            return;
+        }
+        let html = '';
+        animeNames.forEach((name, i) => {
+            html += `
+                <div class="anime-item">
+                    <span class="name">${escapeHtml(name)}</span>
+                    <button class="remove" data-index="${i}" title="Remove">✕</button>
+                </div>
+            `;
+        });
+        animeListEl.innerHTML = html;
+        countLabel.textContent = animeNames.length;
+        document.querySelectorAll('.anime-item .remove').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                const idx = parseInt(this.dataset.index);
+                const removed = animeNames[idx];
+                animeNames.splice(idx, 1);
+                saveData();
+                showToast('Removed ' + removed, 'success');
+                renderList();
+            });
+        });
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // ---------- Toast ----------
+    let toastTimeout;
+    function showToast(msg, type = '') {
+        toast.textContent = msg;
+        toast.className = 'toast show ' + type;
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => { toast.className = 'toast'; }, 3000);
+    }
+
+    // ---------- API calls ----------
+    async function searchAnime(title) {
+        const url = `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(title)}&limit=1`;
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`API error ${resp.status}`);
+        const data = await resp.json();
+        return data.data && data.data.length > 0 ? data.data[0] : null;
+    }
+
+    async function getLatestEpisode(animeId) {
+        const url = `https://api.jikan.moe/v4/anime/${animeId}/episodes`;
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`Episode API error ${resp.status}`);
+        const data = await resp.json();
+        if (data.data && data.data.length > 0) {
+            const last = data.data[data.data.length - 1];
+            return { id: last.episode_id, title: last.title, aired: last.aired };
+        }
+        return null;
+    }
+
+    // ---------- Check all anime ----------
+    async function checkAllAnime() {
+        if (isChecking) return;
+        if (animeNames.length === 0) {
+            showToast('Add some anime first!', 'error');
+            return;
+        }
+        isChecking = true;
+        checkBtn.disabled = true;
+        statusText.textContent = '● Checking...';
+        statusText.className = 'value checking';
+        showToast('Checking...', '');
+
+        let foundNew = false;
+        let messages = [];
+        const now = new Date();
+
+        // Request notification permission if needed (browser only)
+        if (Notification.permission === 'default') {
+            await Notification.requestPermission();
+        }
+
+        for (const name of animeNames) {
+            try {
+                const anime = await searchAnime(name);
+                if (!anime) {
+                    messages.push(`❌ ${name}: not found`);
+                    continue;
+                }
+                const ep = await getLatestEpisode(anime.mal_id);
+                if (!ep) {
+                    messages.push(`⚠️ ${name}: no episodes`);
+                    continue;
+                }
+                const key = `notified_${anime.mal_id}`;
+                const lastNotified = parseInt(localStorage.getItem(key) || '0');
+                if (ep.id > lastNotified) {
+                    localStorage.setItem(key, String(ep.id));
+                    const msg = `📺 ${name} – Episode ${ep.id}: "${ep.title}"`;
+                    messages.push(`✅ ${msg}`);
+                    sendNotification(msg); // Use bridge
+                    foundNew = true;
+                } else {
+                    messages.push(`ℹ️ ${name}: no new episodes`);
+                }
+            } catch (err) {
+                messages.push(`❌ ${name}: error – ${err.message}`);
+            }
+        }
+
+        isChecking = false;
+        checkBtn.disabled = false;
+        statusText.textContent = foundNew ? '● New episodes found!' : '● Idle';
+        statusText.className = 'value running';
+        lastCheckText.textContent = now.toLocaleTimeString();
+        showToast(foundNew ? 'New episodes found! Check notifications.' : 'No new episodes.', 'success');
+        console.log(messages.join('\n'));
+    }
+
+    // ---------- Add anime ----------
+    function addAnime() {
+        const name = prompt('Enter anime title:');
+        if (!name || name.trim() === '') return;
+        const trimmed = name.trim();
+        if (animeNames.includes(trimmed)) {
+            showToast(`"${trimmed}" is already tracked.`, 'error');
+            return;
+        }
+        animeNames.push(trimmed);
+        saveData();
+        showToast(`Added "${trimmed}"`, 'success');
+        renderList();
+    }
+
+    // ---------- Init ----------
+    loadData();
+    renderList();
+    checkBtn.addEventListener('click', checkAllAnime);
+    addBtn.addEventListener('click', addAnime);
+
+    // Request notification permission on user interaction (browser)
+    document.addEventListener('click', () => {
+        if (Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    });
+
+    console.log('Anime Alert loaded! Tracked:', animeNames);
+</script>
+</body>
+</html>

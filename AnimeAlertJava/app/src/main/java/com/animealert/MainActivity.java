@@ -1,139 +1,62 @@
 package com.animealert;
 
 import android.os.Bundle;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.TextView;
-import androidx.appcompat.app.AlertDialog;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.webkit.WebChromeClient;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.work.PeriodicWorkRequest;
-import androidx.work.WorkManager;
-
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.TimeUnit;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.os.Build;
 
 public class MainActivity extends AppCompatActivity {
-    private TextView statusText, lastCheckText;
-    private RecyclerView animeList;
-    private AnimeAdapter adapter;
-    private List<String> animeNames = new ArrayList<>();
-    private Button checkNowButton, addAnimeButton;
+    private static final String CHANNEL_ID = "anime_alerts";
+    private static final String CHANNEL_NAME = "Anime Alerts";
+    private WebView webView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
 
-        statusText = findViewById(R.id.statusText);
-        lastCheckText = findViewById(R.id.lastCheckText);
-        animeList = findViewById(R.id.animeList);
-        checkNowButton = findViewById(R.id.checkNowButton);
-        addAnimeButton = findViewById(R.id.addAnimeButton);
+        // Create notification channel (for Android 8+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH);
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
 
-        // Load saved anime list (simplified – you can use SharedPreferences)
-        animeNames.add("One Piece");
-        animeNames.add("Demon Slayer");
-        animeNames.add("Attack on Titan");
+        webView = new WebView(this);
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.getSettings().setDomStorageEnabled(true);
+        webView.setWebViewClient(new WebViewClient());
+        webView.setWebChromeClient(new WebChromeClient());
 
-        adapter = new AnimeAdapter(animeNames);
-        animeList.setLayoutManager(new LinearLayoutManager(this));
-        animeList.setAdapter(adapter);
+        // Add JavaScript interface for notifications
+        webView.addJavascriptInterface(new WebAppInterface(), "Android");
 
-        // Set status
-        statusText.setText("Status: Running");
-        String currentTime = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
-        lastCheckText.setText("Last check: " + currentTime);
+        // Load the HTML from assets
+        webView.loadUrl("file:///android_asset/anime_alert.html");
 
-        // Schedule periodic check (every 6 hours)
-        PeriodicWorkRequest checkRequest = new PeriodicWorkRequest.Builder(
-                AnimeCheckWorker.class,
-                6, TimeUnit.HOURS)
-                .build();
-        WorkManager.getInstance(this).enqueue(checkRequest);
-
-        // Manual check button
-        checkNowButton.setOnClickListener(v -> {
-            // Trigger a one-time work request
-            androidx.work.OneTimeWorkRequest oneTimeCheck = new androidx.work.OneTimeWorkRequest.Builder(AnimeCheckWorker.class).build();
-            WorkManager.getInstance(this).enqueue(oneTimeCheck);
-            statusText.setText("Status: Checking...");
-            // Update last check time
-            String now = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
-            lastCheckText.setText("Last check: " + now);
-        });
-
-        // Add anime button
-        addAnimeButton.setOnClickListener(v -> {
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setTitle("Add Anime");
-            final android.widget.EditText input = new android.widget.EditText(this);
-            builder.setView(input);
-            builder.setPositiveButton("Add", (dialog, which) -> {
-                String name = input.getText().toString().trim();
-                if (!name.isEmpty() && !animeNames.contains(name)) {
-                    animeNames.add(name);
-                    adapter.notifyDataSetChanged();
-                    // Optionally save to SharedPreferences here
-                }
-            });
-            builder.setNegativeButton("Cancel", null);
-            builder.show();
-        });
-
-        // Remove anime on long click
-        adapter.setOnItemLongClickListener(position -> {
-            animeNames.remove(position);
-            adapter.notifyItemRemoved(position);
-        });
+        setContentView(webView);
     }
 
-    // Simple adapter
-    private class AnimeAdapter extends RecyclerView.Adapter<AnimeAdapter.ViewHolder> {
-        private List<String> data;
-        private OnItemLongClickListener longClickListener;
+    private class WebAppInterface {
+        @JavascriptInterface
+        public void showNotification(String message) {
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(MainActivity.this, CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentTitle("Anime Alert")
+                    .setContentText(message)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setAutoCancel(true);
 
-        public AnimeAdapter(List<String> data) {
-            this.data = data;
+            NotificationManagerCompat manager = NotificationManagerCompat.from(MainActivity.this);
+            manager.notify((int) System.currentTimeMillis(), builder.build());
         }
-
-        @Override
-        public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            TextView tv = new TextView(parent.getContext());
-            tv.setPadding(16, 16, 16, 16);
-            tv.setTextSize(16);
-            return new ViewHolder(tv);
-        }
-
-        @Override
-        public void onBindViewHolder(ViewHolder holder, int position) {
-            holder.textView.setText(data.get(position));
-            holder.textView.setOnLongClickListener(v -> {
-                if (longClickListener != null) longClickListener.onLongClick(position);
-                return true;
-            });
-        }
-
-        @Override
-        public int getItemCount() { return data.size(); }
-
-        public void setOnItemLongClickListener(OnItemLongClickListener listener) {
-            this.longClickListener = listener;
-        }
-
-        class ViewHolder extends RecyclerView.ViewHolder {
-            TextView textView;
-            ViewHolder(TextView v) { super(v); textView = v; }
-        }
-    }
-
-    interface OnItemLongClickListener {
-        void onLongClick(int position);
     }
 }
