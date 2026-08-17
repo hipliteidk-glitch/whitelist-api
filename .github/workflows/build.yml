@@ -9,21 +9,29 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout code (no submodules)
         uses: actions/checkout@v4
         with:
           submodules: false
-          fetch-depth: 1
 
-      - name: Build APK with Buildozer
-        uses: artem-shestakov/buildozer-action@v1
-        id: buildozer
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          workdir: anime_alert
-          buildozer_version: master
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y openjdk-17-jdk unzip zip
+          pip install buildozer Cython
+
+      - name: Build APK
+        run: |
+          cd anime_alert
+          buildozer android debug --verbose
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: anime-alert-apk
-          path: ${{ steps.buildozer.outputs.filename }}
+          path: anime_alert/bin/*.apk
