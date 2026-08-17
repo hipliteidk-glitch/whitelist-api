@@ -19,5 +19,4 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/home/user/hostcwd \
             -w /home/user/hostcwd/anime_alert \
-            kivy/buildozer \
-            buildozer android debug
+            kivy/buildozer android debug
