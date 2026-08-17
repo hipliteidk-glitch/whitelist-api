@@ -19,10 +19,14 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt update
-          sudo apt install -y openjdk-17-jdk unzip zip
+          sudo apt install -y openjdk-17-jdk unzip zip \
+            autoconf automake libtool pkg-config build-essential
+
+      - name: Install Python dependencies
+        run: |
           pip install buildozer Cython
 
       - name: Build APK
