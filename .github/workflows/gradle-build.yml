@@ -1,4 +1,4 @@
-name: Build Signed APK
+name: Build Debug APK
 
 on:
   push:
@@ -20,34 +20,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Generate keystore
-        run: |
-          keytool -genkey -v -keystore release.keystore \
-            -alias animealert -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Anime Alert, OU=Dev, O=Anime Alert, L=City, S=State, C=US" \
-            -storepass password -keypass password
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.4
 
-      - name: Build signed APK
-        env:
-          KEYSTORE_PATH: release.keystore
-          KEYSTORE_PASSWORD: password
-          KEY_ALIAS: animealert
-          KEY_PASSWORD: password
+      - name: Build debug APK
         run: |
           cd AnimeAlertJava
-          gradle assembleRelease \
-            -Pandroid.injected.signing.store.file=$KEYSTORE_PATH \
-            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+          gradle assembleDebug
 
-      - name: Upload signed APK
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: anime-alert-signed-apk
-          path: AnimeAlertJava/app/build/outputs/apk/release/*.apk
+          name: anime-alert-debug-apk
+          path: AnimeAlertJava/app/build/outputs/apk/debug/*.apk
