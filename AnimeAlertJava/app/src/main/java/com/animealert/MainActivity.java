@@ -39,8 +39,8 @@ public class MainActivity extends AppCompatActivity {
         // Add JavaScript interface for notifications
         webView.addJavascriptInterface(new WebAppInterface(), "Android");
 
-        // Load the HTML from assets
-        webView.loadUrl("file:///android_asset/anime_alert.html");
+        // Load the new AniNotify HTML from assets
+        webView.loadUrl("file:///android_asset/index.html");
 
         setContentView(webView);
     }
