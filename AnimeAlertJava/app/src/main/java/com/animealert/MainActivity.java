@@ -1,6 +1,11 @@
 package com.animealert;
 
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -10,11 +15,12 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.os.Build;
+import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
     private static final String CHANNEL_ID = "anime_alerts";
     private static final String CHANNEL_NAME = "Anime Alerts";
+    private static final int OVERLAY_PERMISSION_REQUEST = 1001;
     private WebView webView;
 
     @Override
@@ -28,6 +34,16 @@ public class MainActivity extends AppCompatActivity {
             if (manager != null) {
                 manager.createNotificationChannel(channel);
             }
+        }
+
+        // Start the floating overlay service
+        startFloatingService();
+
+        // Request overlay permission if needed
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName()));
+            startActivityForResult(intent, OVERLAY_PERMISSION_REQUEST);
         }
 
         webView = new WebView(this);
@@ -45,6 +61,23 @@ public class MainActivity extends AppCompatActivity {
         setContentView(webView);
     }
 
+    private void startFloatingService() {
+        Intent serviceIntent = new Intent(this, FloatingAlertService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Stop the floating service when app is closed
+        Intent serviceIntent = new Intent(this, FloatingAlertService.class);
+        stopService(serviceIntent);
+    }
+
     private class WebAppInterface {
         @JavascriptInterface
         public void showNotification(String message) {
@@ -57,6 +90,12 @@ public class MainActivity extends AppCompatActivity {
 
             NotificationManagerCompat manager = NotificationManagerCompat.from(MainActivity.this);
             manager.notify((int) System.currentTimeMillis(), builder.build());
+
+            // Increment overlay count when a new episode is found
+            // We'll read the current count and add 1
+            android.content.SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
+            int currentCount = prefs.getInt("new_episodes_count", 0);
+            prefs.edit().putInt("new_episodes_count", currentCount + 1).apply();
         }
     }
 }
