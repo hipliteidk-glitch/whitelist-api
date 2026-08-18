@@ -65,9 +65,6 @@
   <footer class="footer"><div class="wrap">AniNotify HTML Edition · Powered by AniList · Your watchlist stays in your browser.</div></footer>
 
   <script>
-    const NTFY_TOPIC = 'zeroscript_alerts';
-    const NTFY_URL = 'https://ntfy.sh/' + NTFY_TOPIC;
-
     const API='https://graphql.anilist.co';
     const QUERY=`query($search:String){Page(page:1,perPage:30){media(type:ANIME,status:RELEASING,isAdult:false,search:$search,sort:POPULARITY_DESC){id title{romaji english} description(asHtml:false) coverImage{extraLarge} bannerImage averageScore genres format seasonYear nextAiringEpisode{episode airingAt}}}}`;
     const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -141,25 +138,25 @@
     $('#alUnlink').onclick=()=>{localStorage.removeItem('aninotify-html-anilist');renderAl();toast('AniList unlinked — saved shows stay in your watchlist')};
     document.onkeydown=e=>{if(e.key==='Escape')$('#modal').classList.remove('open')};setInterval(()=>{renderSync();const L=alLinked();if(L)$('#alWhen').textContent='Linked '+relAgo(L.at)+' · list stored in this browser'},30000);updateBadge();renderSync();renderAl();load();
 
-    // ---------- Test Notification ----------
+    // ---------- Test Notification (Android system notification) ----------
     async function sendTestNotification() {
       const testMessage = 'Test notification from AniNotify!';
-      try {
-        const response = await fetch(NTFY_URL, {
-          method: 'POST',
-          headers: {
-            'Title': 'Test Notification',
-            'Priority': 'high'
-          },
-          body: testMessage
-        });
-        if (response.ok) {
-          toast('Test notification sent to ntfy!');
+      // Use Android bridge if available
+      if (typeof Android !== 'undefined' && Android.showNotification) {
+        Android.showNotification(testMessage);
+        toast('✅ Android notification sent!');
+      } else if (Notification.permission === 'granted') {
+        new Notification('Anime Alert Test', { body: testMessage });
+        toast('✅ Browser notification sent!');
+      } else {
+        // Request permission
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          new Notification('Anime Alert Test', { body: testMessage });
+          toast('✅ Notification sent (permission granted)');
         } else {
-          toast('Failed to send test (status ' + response.status + ')');
+          toast('❌ Notification permission denied.');
         }
-      } catch (err) {
-        toast('Error: ' + err.message);
       }
     }
     document.getElementById('testBtn').addEventListener('click', sendTestNotification);
