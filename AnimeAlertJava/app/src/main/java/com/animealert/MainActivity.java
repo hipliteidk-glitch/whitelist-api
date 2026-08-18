@@ -1,6 +1,7 @@
 package com.animealert;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -78,9 +79,26 @@ public class MainActivity extends AppCompatActivity {
         stopService(serviceIntent);
     }
 
+    // Clear the counter when app is opened (user has seen notifications)
+    @Override
+    protected void onResume() {
+        super.onResume();
+        SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
+        int count = prefs.getInt("new_episodes_count", 0);
+        if (count > 0) {
+            // Reset counter after opening app (user has seen new episodes)
+            prefs.edit().putInt("new_episodes_count", 0).apply();
+            // The service will pick up the change on its next update
+        }
+    }
+
     private class WebAppInterface {
         @JavascriptInterface
         public void showNotification(String message) {
+            // Store the latest episode message for overlay preview
+            SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
+            prefs.edit().putString("latest_episode", message).apply();
+
             NotificationCompat.Builder builder = new NotificationCompat.Builder(MainActivity.this, CHANNEL_ID)
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .setContentTitle("Anime Alert")
@@ -92,8 +110,6 @@ public class MainActivity extends AppCompatActivity {
             manager.notify((int) System.currentTimeMillis(), builder.build());
 
             // Increment overlay count when a new episode is found
-            // We'll read the current count and add 1
-            android.content.SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
             int currentCount = prefs.getInt("new_episodes_count", 0);
             prefs.edit().putInt("new_episodes_count", currentCount + 1).apply();
         }

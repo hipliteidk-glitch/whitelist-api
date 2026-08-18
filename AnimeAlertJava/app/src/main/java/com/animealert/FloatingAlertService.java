@@ -19,6 +19,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.core.app.NotificationCompat;
 
@@ -38,14 +39,12 @@ public class FloatingAlertService extends Service {
         createNotificationChannel();
         startForeground(NOTIFICATION_ID, createNotification());
         createFloatingView();
-        // Load initial count
         loadCount();
-        // Set up periodic update check
         updateRunnable = new Runnable() {
             @Override
             public void run() {
                 updateCount();
-                handler.postDelayed(this, 5000); // check every 5 seconds
+                handler.postDelayed(this, 5000);
             }
         };
         handler.post(updateRunnable);
@@ -97,10 +96,10 @@ public class FloatingAlertService extends Service {
         params.x = 50;
         params.y = 100;
 
-        // Drag to move
         floatingView.setOnTouchListener(new View.OnTouchListener() {
             private int initialX, initialY;
             private float initialTouchX, initialTouchY;
+            private long lastTapTime = 0;
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -117,14 +116,32 @@ public class FloatingAlertService extends Service {
                         windowManager.updateViewLayout(floatingView, params);
                         return true;
                     case MotionEvent.ACTION_UP:
-                        // Check if it's a tap (not a drag)
                         float dx = event.getRawX() - initialTouchX;
                         float dy = event.getRawY() - initialTouchY;
-                        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-                            // Open app
-                            Intent intent = new Intent(FloatingAlertService.this, MainActivity.class);
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            startActivity(intent);
+                        long now = System.currentTimeMillis();
+                        if (Math.abs(dx) < 15 && Math.abs(dy) < 15) {
+                            // It's a tap, not a drag
+                            // Double-tap to clear counter
+                            if (now - lastTapTime < 400) {
+                                // Double tap: clear count
+                                SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
+                                prefs.edit().putInt("new_episodes_count", 0).apply();
+                                updateCount();
+                                Toast.makeText(FloatingAlertService.this, "Counter cleared", Toast.LENGTH_SHORT).show();
+                                lastTapTime = 0;
+                            } else {
+                                // Single tap: open app and show preview toast
+                                lastTapTime = now;
+                                // Show a preview of the latest episode if available
+                                SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
+                                String latest = prefs.getString("latest_episode", null);
+                                if (latest != null && !latest.isEmpty()) {
+                                    Toast.makeText(FloatingAlertService.this, latest, Toast.LENGTH_LONG).show();
+                                }
+                                Intent intent = new Intent(FloatingAlertService.this, MainActivity.class);
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(intent);
+                            }
                         }
                         return true;
                 }
@@ -147,11 +164,11 @@ public class FloatingAlertService extends Service {
         if (newCount != count) {
             count = newCount;
             if (countText != null) {
-                countText.setText(String.valueOf(count));
                 if (count == 0) {
                     countText.setText("");
                     floatingView.setVisibility(View.GONE);
                 } else {
+                    countText.setText(String.valueOf(count));
                     floatingView.setVisibility(View.VISIBLE);
                 }
             }
@@ -161,7 +178,6 @@ public class FloatingAlertService extends Service {
     public static void updateCount(Context context, int newCount) {
         SharedPreferences prefs = context.getSharedPreferences("anime_alert", MODE_PRIVATE);
         prefs.edit().putInt("new_episodes_count", newCount).apply();
-        // The service will pick it up on its periodic update
     }
 
     @Override
