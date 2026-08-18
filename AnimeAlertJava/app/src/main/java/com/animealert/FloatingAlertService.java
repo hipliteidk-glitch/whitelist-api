@@ -32,6 +32,9 @@ public class FloatingAlertService extends Service {
     private int count = 0;
     private Handler handler = new Handler(Looper.getMainLooper());
     private Runnable updateRunnable;
+    private long countdownTarget = 0;
+    private String countdownTitle = "";
+    private boolean isCountdownMode = false;
 
     @Override
     public void onCreate() {
@@ -39,12 +42,12 @@ public class FloatingAlertService extends Service {
         createNotificationChannel();
         startForeground(NOTIFICATION_ID, createNotification());
         createFloatingView();
-        loadCount();
+        loadCountdown();
         updateRunnable = new Runnable() {
             @Override
             public void run() {
-                updateCount();
-                handler.postDelayed(this, 5000);
+                updateDisplay();
+                handler.postDelayed(this, 1000); // update every second
             }
         };
         handler.post(updateRunnable);
@@ -120,19 +123,17 @@ public class FloatingAlertService extends Service {
                         float dy = event.getRawY() - initialTouchY;
                         long now = System.currentTimeMillis();
                         if (Math.abs(dx) < 15 && Math.abs(dy) < 15) {
-                            // It's a tap, not a drag
-                            // Double-tap to clear counter
                             if (now - lastTapTime < 400) {
-                                // Double tap: clear count
+                                // Double tap: clear countdown and switch to counter mode
                                 SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
-                                prefs.edit().putInt("new_episodes_count", 0).apply();
-                                updateCount();
-                                Toast.makeText(FloatingAlertService.this, "Counter cleared", Toast.LENGTH_SHORT).show();
+                                prefs.edit().putLong("countdown_target", 0).apply();
+                                loadCountdown();
+                                updateDisplay();
+                                Toast.makeText(FloatingAlertService.this, "Countdown cleared", Toast.LENGTH_SHORT).show();
                                 lastTapTime = 0;
                             } else {
-                                // Single tap: open app and show preview toast
                                 lastTapTime = now;
-                                // Show a preview of the latest episode if available
+                                // Single tap: show preview and open app
                                 SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
                                 String latest = prefs.getString("latest_episode", null);
                                 if (latest != null && !latest.isEmpty()) {
@@ -150,34 +151,65 @@ public class FloatingAlertService extends Service {
         });
 
         windowManager.addView(floatingView, params);
-        updateCount();
+        updateDisplay();
     }
 
-    private void loadCount() {
+    private void loadCountdown() {
         SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
-        count = prefs.getInt("new_episodes_count", 0);
-    }
-
-    private void updateCount() {
-        SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
-        int newCount = prefs.getInt("new_episodes_count", 0);
-        if (newCount != count) {
-            count = newCount;
-            if (countText != null) {
-                if (count == 0) {
-                    countText.setText("");
-                    floatingView.setVisibility(View.GONE);
-                } else {
-                    countText.setText(String.valueOf(count));
-                    floatingView.setVisibility(View.VISIBLE);
-                }
-            }
+        countdownTarget = prefs.getLong("countdown_target", 0);
+        countdownTitle = prefs.getString("countdown_title", "");
+        isCountdownMode = countdownTarget > System.currentTimeMillis();
+        // If countdown expired, switch to counter mode
+        if (!isCountdownMode && countdownTarget > 0) {
+            prefs.edit().putLong("countdown_target", 0).apply();
+            countdownTarget = 0;
         }
     }
 
-    public static void updateCount(Context context, int newCount) {
-        SharedPreferences prefs = context.getSharedPreferences("anime_alert", MODE_PRIVATE);
-        prefs.edit().putInt("new_episodes_count", newCount).apply();
+    private String formatCountdown(long millis) {
+        if (millis <= 0) return "0s";
+        long seconds = millis / 1000;
+        long minutes = seconds / 60;
+        long hours = minutes / 60;
+        long days = hours / 24;
+        if (days > 0) {
+            return days + "d " + (hours % 24) + "h";
+        } else if (hours > 0) {
+            return hours + "h " + (minutes % 60) + "m";
+        } else if (minutes > 0) {
+            return minutes + "m " + (seconds % 60) + "s";
+        } else {
+            return seconds + "s";
+        }
+    }
+
+    private void updateDisplay() {
+        loadCountdown();
+        SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
+
+        if (isCountdownMode && countdownTarget > System.currentTimeMillis()) {
+            // Show countdown
+            long remaining = countdownTarget - System.currentTimeMillis();
+            String timeStr = formatCountdown(remaining);
+            String display = countdownTitle.isEmpty() ? timeStr : countdownTitle + " " + timeStr;
+            // Truncate if too long
+            if (display.length() > 20) display = timeStr;
+            countText.setText(display);
+            floatingView.setVisibility(View.VISIBLE);
+        } else {
+            // Fallback to counter mode
+            int newCount = prefs.getInt("new_episodes_count", 0);
+            if (newCount != count) {
+                count = newCount;
+            }
+            if (count == 0) {
+                countText.setText("");
+                floatingView.setVisibility(View.GONE);
+            } else {
+                countText.setText(String.valueOf(count));
+                floatingView.setVisibility(View.VISIBLE);
+            }
+        }
     }
 
     @Override

@@ -116,7 +116,24 @@
     function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
     async function load(search=''){
       $('#grid').innerHTML='<div class="loading"><div class="spinner"></div>Calling AniList…</div>';
-      try{const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:QUERY,variables:{search:search||null}})});if(!r.ok)throw new Error('AniList unavailable');const j=await r.json();anime=j.data.Page.media||[];markSync(anime.length);fillGenres();render()}catch(e){$('#syncBtn').disabled=false;$('#syncStatus').textContent='Sync failed · retry';$('#grid').innerHTML='<div class="empty">Could not reach AniList. <button class="btn secondary" onclick="load()">Try again</button></div>'}
+      try{const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:QUERY,variables:{search:search||null}})});if(!r.ok)throw new Error('AniList unavailable');const j=await r.json();anime=j.data.Page.media||[];markSync(anime.length);fillGenres();render();
+        // -------- Set countdown for the soonest airing ----------
+        let earliest = null;
+        let earliestTime = Infinity;
+        for (const a of anime) {
+          if (a.nextAiringEpisode && a.nextAiringEpisode.airingAt) {
+            const time = a.nextAiringEpisode.airingAt * 1000;
+            if (time < earliestTime) {
+              earliestTime = time;
+              earliest = a;
+            }
+          }
+        }
+        if (earliest && typeof Android !== 'undefined' && Android.setCountdownTarget) {
+          Android.setCountdownTarget(earliestTime, title(earliest));
+        }
+        // --------------------------------------------------------
+      }catch(e){$('#syncBtn').disabled=false;$('#syncStatus').textContent='Sync failed · retry';$('#grid').innerHTML='<div class="empty">Could not reach AniList. <button class="btn secondary" onclick="load()">Try again</button></div>'}
     }
     function fillGenres(){const select=$('#genre'),old=select.value;const genres=[...new Set(anime.flatMap(a=>a.genres))].sort();select.innerHTML='<option value="">All genres</option>'+genres.map(g=>'<option>'+esc(g)+'</option>').join('');select.value=old}
     function render(){let list=[...anime],g=$('#genre').value,sort=$('#sort').value;if(g)list=list.filter(a=>a.genres.includes(g));if(sort==='score')list.sort((a,b)=>(b.averageScore||0)-(a.averageScore||0));if(sort==='title')list.sort((a,b)=>title(a).localeCompare(title(b)));$('#heading').textContent=$('#search').value?'Results for “'+$('#search').value+'”':'Now airing';$('#grid').innerHTML=list.length?list.map(a=>'<article class="card" data-id="'+a.id+'"><div class="poster"><img loading="lazy" src="'+esc(a.coverImage.extraLarge)+'" alt="'+esc(title(a))+'"><span class="status">AIRING</span><span class="score">★ '+(a.averageScore?(a.averageScore/10).toFixed(1):'—')+'</span><div class="card-text"><h3>'+esc(title(a))+'</h3><div class="meta">'+esc(a.genres.slice(0,2).join(' · '))+(a.nextAiringEpisode?' · Ep '+a.nextAiringEpisode.episode:'')+'</div></div></div></article>').join(''):'<div class="empty">Nothing matched this filter.</div>';$$('.card').forEach(c=>c.onclick=()=>openAnime(Number(c.dataset.id)))}
@@ -141,7 +158,6 @@
     // ---------- Test Notification (Android system notification) ----------
     async function sendTestNotification() {
       const testMessage = 'Test notification from AniNotify!';
-      // Use Android bridge if available
       if (typeof Android !== 'undefined' && Android.showNotification) {
         Android.showNotification(testMessage);
         toast('✅ Android notification sent!');
@@ -149,7 +165,6 @@
         new Notification('Anime Alert Test', { body: testMessage });
         toast('✅ Browser notification sent!');
       } else {
-        // Request permission
         const perm = await Notification.requestPermission();
         if (perm === 'granted') {
           new Notification('Anime Alert Test', { body: testMessage });

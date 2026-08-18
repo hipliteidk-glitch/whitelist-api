@@ -53,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new WebChromeClient());
 
-        // Add JavaScript interface for notifications
+        // Add JavaScript interface for notifications and countdown
         webView.addJavascriptInterface(new WebAppInterface(), "Android");
 
         // Load the new AniNotify HTML from assets
@@ -86,16 +86,13 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
         int count = prefs.getInt("new_episodes_count", 0);
         if (count > 0) {
-            // Reset counter after opening app (user has seen new episodes)
             prefs.edit().putInt("new_episodes_count", 0).apply();
-            // The service will pick up the change on its next update
         }
     }
 
     private class WebAppInterface {
         @JavascriptInterface
         public void showNotification(String message) {
-            // Store the latest episode message for overlay preview
             SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
             prefs.edit().putString("latest_episode", message).apply();
 
@@ -109,9 +106,16 @@ public class MainActivity extends AppCompatActivity {
             NotificationManagerCompat manager = NotificationManagerCompat.from(MainActivity.this);
             manager.notify((int) System.currentTimeMillis(), builder.build());
 
-            // Increment overlay count when a new episode is found
             int currentCount = prefs.getInt("new_episodes_count", 0);
             prefs.edit().putInt("new_episodes_count", currentCount + 1).apply();
+        }
+
+        @JavascriptInterface
+        public void setCountdownTarget(long timestamp, String title) {
+            SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
+            prefs.edit().putLong("countdown_target", timestamp)
+                 .putString("countdown_title", title)
+                 .apply();
         }
     }
 }
