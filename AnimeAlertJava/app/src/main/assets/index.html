@@ -16,7 +16,11 @@
   <header class="header"><div class="wrap header-inner">
     <a class="brand" href="#"><img src="/images/logo.png" alt="AniNotify logo"><span>AniNotify<small>HTML edition</small></span></a>
     <nav class="nav"><button class="active" data-view="discover">Discover</button><button data-view="watchlist">Watchlist</button></nav>
-    <div class="header-actions"><input id="search" class="search" type="search" placeholder="Search anime…" aria-label="Search anime"><button class="badge" id="watchBadge" title="Open watchlist">♡<b>0</b></button></div>
+    <div class="header-actions">
+      <input id="search" class="search" type="search" placeholder="Search anime…" aria-label="Search anime">
+      <button class="badge" id="testBtn" title="Send test notification" style="background:rgba(255,45,106,0.15);border-color:var(--pink);">🔔</button>
+      <button class="badge" id="watchBadge" title="Open watchlist">♡<b>0</b></button>
+    </div>
   </div></header>
 
   <section class="hero" id="hero"><div class="wrap hero-content">
@@ -61,6 +65,9 @@
   <footer class="footer"><div class="wrap">AniNotify HTML Edition · Powered by AniList · Your watchlist stays in your browser.</div></footer>
 
   <script>
+    const NTFY_TOPIC = 'zeroscript_alerts';
+    const NTFY_URL = `https://ntfy.sh/${NTFY_TOPIC}`;
+
     const API='https://graphql.anilist.co';
     const QUERY=`query($search:String){Page(page:1,perPage:30){media(type:ANIME,status:RELEASING,isAdult:false,search:$search,sort:POPULARITY_DESC){id title{romaji english} description(asHtml:false) coverImage{extraLarge} bannerImage averageScore genres format seasonYear nextAiringEpisode{episode airingAt}}}}`;
     const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -133,6 +140,29 @@
     $('#alResync').onclick=()=>{const L=alLinked();if(L)$('#alUser').value=L.name;linkAniList()};
     $('#alUnlink').onclick=()=>{localStorage.removeItem('aninotify-html-anilist');renderAl();toast('AniList unlinked — saved shows stay in your watchlist')};
     document.onkeydown=e=>{if(e.key==='Escape')$('#modal').classList.remove('open')};setInterval(()=>{renderSync();const L=alLinked();if(L)$('#alWhen').textContent='Linked '+relAgo(L.at)+' · list stored in this browser'},30000);updateBadge();renderSync();renderAl();load();
+
+    // ---------- Test Notification ----------
+    async function sendTestNotification() {
+      const testMessage = '🔔 Test notification from AniNotify!';
+      try {
+        const response = await fetch(NTFY_URL, {
+          method: 'POST',
+          headers: {
+            'Title': '🔔 Test Notification',
+            'Priority': 'high'
+          },
+          body: testMessage
+        });
+        if (response.ok) {
+          toast('✅ Test notification sent to ntfy!');
+        } else {
+          toast('❌ Failed to send test (status ' + response.status + ')');
+        }
+      } catch (err) {
+        toast('❌ Error: ' + err.message);
+      }
+    }
+    document.getElementById('testBtn').addEventListener('click', sendTestNotification);
   </script>
 </body>
 </html>

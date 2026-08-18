@@ -7,6 +7,27 @@ from datetime import datetime, timedelta
 
 SHOWS_FILE = 'shows.txt'
 LOG_FILE = 'sent.log'
+NTFY_TOPIC = 'zeroscript_alerts'
+
+def send_ntfy(message, title='Anime Alert', priority='default'):
+    """Send a notification to ntfy.sh"""
+    url = f'https://ntfy.sh/{NTFY_TOPIC}'
+    headers = {'Title': title, 'Priority': priority}
+    try:
+        response = requests.post(url, data=message, headers=headers, timeout=10)
+        return response.status_code == 200
+    except Exception as e:
+        print(f'Failed to send ntfy: {e}')
+        return False
+
+def test_ntfy():
+    """Send a test notification to ntfy"""
+    print('Sending test notification to ntfy...')
+    ok = send_ntfy('Test notification from Anime Alert!', title='🔔 Test', priority='high')
+    if ok:
+        print('✅ Test notification sent!')
+    else:
+        print('❌ Failed to send test notification.')
 
 def load_shows():
     if not os.path.exists(SHOWS_FILE):
@@ -40,6 +61,10 @@ def get_episode_info(anime_id):
     return None
 
 def send_notification(title, message):
+    # Try ntfy first
+    if send_ntfy(message, title=title):
+        return
+    # Fallback to termux-notification
     try:
         subprocess.run(['termux-notification', '--title', title, '--content', message], check=True)
     except:
@@ -73,6 +98,10 @@ def main():
             f.write(key + '\n')
 
 if __name__ == "__main__":
-    while True:
-        main()
-        time.sleep(21600)
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == 'test':
+        test_ntfy()
+    else:
+        while True:
+            main()
+            time.sleep(21600)
