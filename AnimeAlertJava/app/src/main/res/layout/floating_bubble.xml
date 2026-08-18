@@ -1,19 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="56dp"
-    android:layout_height="56dp"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
     android:background="@drawable/bubble_background"
-    android:elevation="8dp">
+    android:padding="6dp 8dp"
+    android:gravity="center"
+    android:elevation="8dp"
+    android:minWidth="56dp">
+
+    <TextView
+        android:id="@+id/bubble_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#ffffff"
+        android:textSize="10sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:text=""/>
 
     <TextView
         android:id="@+id/bubble_count"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
         android:textColor="#ffffff"
         android:textSize="18sp"
         android:textStyle="bold"
         android:gravity="center"
-        android:minWidth="24dp"
-        android:padding="4dp" />
-</FrameLayout>
+        android:text=""/>
+</LinearLayout>

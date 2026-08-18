@@ -28,6 +28,7 @@ public class FloatingAlertService extends Service {
     private static final int NOTIFICATION_ID = 1001;
     private WindowManager windowManager;
     private View floatingView;
+    private TextView titleText;
     private TextView countText;
     private int count = 0;
     private Handler handler = new Handler(Looper.getMainLooper());
@@ -47,7 +48,7 @@ public class FloatingAlertService extends Service {
             @Override
             public void run() {
                 updateDisplay();
-                handler.postDelayed(this, 1000); // update every second
+                handler.postDelayed(this, 1000);
             }
         };
         handler.post(updateRunnable);
@@ -79,6 +80,7 @@ public class FloatingAlertService extends Service {
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         LayoutInflater inflater = (LayoutInflater) getSystemService(LAYOUT_INFLATER_SERVICE);
         floatingView = inflater.inflate(R.layout.floating_bubble, null);
+        titleText = floatingView.findViewById(R.id.bubble_title);
         countText = floatingView.findViewById(R.id.bubble_count);
 
         int layoutFlag;
@@ -159,7 +161,6 @@ public class FloatingAlertService extends Service {
         countdownTarget = prefs.getLong("countdown_target", 0);
         countdownTitle = prefs.getString("countdown_title", "");
         isCountdownMode = countdownTarget > System.currentTimeMillis();
-        // If countdown expired, switch to counter mode
         if (!isCountdownMode && countdownTarget > 0) {
             prefs.edit().putLong("countdown_target", 0).apply();
             countdownTarget = 0;
@@ -183,18 +184,22 @@ public class FloatingAlertService extends Service {
         }
     }
 
+    private String truncateTitle(String title, int maxLen) {
+        if (title == null) return "";
+        if (title.length() <= maxLen) return title;
+        return title.substring(0, maxLen) + "…";
+    }
+
     private void updateDisplay() {
         loadCountdown();
         SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
 
         if (isCountdownMode && countdownTarget > System.currentTimeMillis()) {
-            // Show countdown
             long remaining = countdownTarget - System.currentTimeMillis();
             String timeStr = formatCountdown(remaining);
-            String display = countdownTitle.isEmpty() ? timeStr : countdownTitle + " " + timeStr;
-            // Truncate if too long
-            if (display.length() > 20) display = timeStr;
-            countText.setText(display);
+            String displayTitle = countdownTitle.isEmpty() ? "Next" : truncateTitle(countdownTitle, 12);
+            titleText.setText(displayTitle);
+            countText.setText(timeStr);
             floatingView.setVisibility(View.VISIBLE);
         } else {
             // Fallback to counter mode
@@ -203,9 +208,11 @@ public class FloatingAlertService extends Service {
                 count = newCount;
             }
             if (count == 0) {
+                titleText.setText("");
                 countText.setText("");
                 floatingView.setVisibility(View.GONE);
             } else {
+                titleText.setText("New");
                 countText.setText(String.valueOf(count));
                 floatingView.setVisibility(View.VISIBLE);
             }
