@@ -66,7 +66,7 @@
 
   <script>
     const NTFY_TOPIC = 'zeroscript_alerts';
-    const NTFY_URL = `https://ntfy.sh/${NTFY_TOPIC}`;
+    const NTFY_URL = 'https://ntfy.sh/' + NTFY_TOPIC;
 
     const API='https://graphql.anilist.co';
     const QUERY=`query($search:String){Page(page:1,perPage:30){media(type:ANIME,status:RELEASING,isAdult:false,search:$search,sort:POPULARITY_DESC){id title{romaji english} description(asHtml:false) coverImage{extraLarge} bannerImage averageScore genres format seasonYear nextAiringEpisode{episode airingAt}}}}`;
@@ -76,7 +76,7 @@
     const store=list=>{localStorage.setItem('aninotify-html-watchlist',JSON.stringify(list));updateBadge()};
     const syncMeta=()=>JSON.parse(localStorage.getItem('aninotify-html-sync')||'null');
     function markSync(n){localStorage.setItem('aninotify-html-sync',JSON.stringify({at:Date.now(),count:n}));renderSync()}
-    function renderSync(){const el=$('#syncStatus');if(!el)return;const m=syncMeta();if(!m){el.textContent='Not synced yet';return}const s=Math.max(0,Math.floor((Date.now()-m.at)/1000));const ago=s<10?'just now':s<60?s+'s ago':s<3600?Math.floor(s/60)+'m ago':s<86400?Math.floor(s/3600)+'h ago':Math.floor(s/86400)+'d ago';el.textContent=`Updated ${ago} · ${m.count} titles`}
+    function renderSync(){const el=$('#syncStatus');if(!el)return;const m=syncMeta();if(!m){el.textContent='Not synced yet';return}const s=Math.max(0,Math.floor((Date.now()-m.at)/1000));const ago=s<10?'just now':s<60?s+'s ago':s<3600?Math.floor(s/60)+'m ago':s<86400?Math.floor(s/3600)+'h ago':Math.floor(s/86400)+'d ago';el.textContent='Updated '+ago+' · '+m.count+' titles'}
     function relAgo(ts){const s=Math.max(0,Math.floor((Date.now()-ts)/1000));return s<10?'just now':s<60?s+'s ago':s<3600?Math.floor(s/60)+'m ago':s<86400?Math.floor(s/3600)+'h ago':Math.floor(s/86400)+'d ago'}
     // --- AniList username link (public list, no auth, browser CORS allowed) ---
     const AL_USER_QUERY='query($n:String){User(name:$n){id name}}';
@@ -119,22 +119,22 @@
     function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
     async function load(search=''){
       $('#grid').innerHTML='<div class="loading"><div class="spinner"></div>Calling AniList…</div>';
-      try{const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:QUERY,variables:{search:search||null}})});if(!r.ok)throw new Error('AniList unavailable');const j=await r.json();anime=j.data.Page.media||[];markSync(anime.length);fillGenres();render()}catch(e){$('#syncBtn').disabled=false;$('#syncStatus').textContent='Sync failed · retry';$('#grid').innerHTML=`<div class="empty">Could not reach AniList. <button class="btn secondary" onclick="load()">Try again</button></div>`}
+      try{const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:QUERY,variables:{search:search||null}})});if(!r.ok)throw new Error('AniList unavailable');const j=await r.json();anime=j.data.Page.media||[];markSync(anime.length);fillGenres();render()}catch(e){$('#syncBtn').disabled=false;$('#syncStatus').textContent='Sync failed · retry';$('#grid').innerHTML='<div class="empty">Could not reach AniList. <button class="btn secondary" onclick="load()">Try again</button></div>'}
     }
-    function fillGenres(){const select=$('#genre'),old=select.value;const genres=[...new Set(anime.flatMap(a=>a.genres))].sort();select.innerHTML='<option value="">All genres</option>'+genres.map(g=>`<option>${esc(g)}</option>`).join('');select.value=old}
-    function render(){let list=[...anime],g=$('#genre').value,sort=$('#sort').value;if(g)list=list.filter(a=>a.genres.includes(g));if(sort==='score')list.sort((a,b)=>(b.averageScore||0)-(a.averageScore||0));if(sort==='title')list.sort((a,b)=>title(a).localeCompare(title(b)));$('#heading').textContent=$('#search').value?`Results for “${$('#search').value}”`:'Now airing';$('#grid').innerHTML=list.length?list.map(a=>`<article class="card" data-id="${a.id}"><div class="poster"><img loading="lazy" src="${esc(a.coverImage.extraLarge)}" alt="${esc(title(a))}"><span class="status">AIRING</span><span class="score">★ ${a.averageScore?(a.averageScore/10).toFixed(1):'—'}</span><div class="card-text"><h3>${esc(title(a))}</h3><div class="meta">${esc(a.genres.slice(0,2).join(' · '))}${a.nextAiringEpisode?' · Ep '+a.nextAiringEpisode.episode:''}</div></div></div></article>`).join(''):'<div class="empty">Nothing matched this filter.</div>';$$('.card').forEach(c=>c.onclick=()=>openAnime(Number(c.dataset.id)))}
-    function openAnime(id){current=anime.find(a=>a.id===id)||saved().find(a=>a.id===id);if(!current)return;$('#modalImage').src=current.bannerImage||current.coverImage.extraLarge;$('#modalImage').alt=title(current);$('#modalTitle').textContent=title(current);$('#modalEyebrow').textContent=`${(current.format||'TV').replace('_',' ')} · ${current.seasonYear||'TBA'}`;$('#modalChips').innerHTML=current.genres.slice(0,5).map(g=>`<span class="chip">${esc(g)}</span>`).join('');$('#modalDescription').textContent=clean(current.description);setTrackText();$('#modal').classList.add('open')}
+    function fillGenres(){const select=$('#genre'),old=select.value;const genres=[...new Set(anime.flatMap(a=>a.genres))].sort();select.innerHTML='<option value="">All genres</option>'+genres.map(g=>'<option>'+esc(g)+'</option>').join('');select.value=old}
+    function render(){let list=[...anime],g=$('#genre').value,sort=$('#sort').value;if(g)list=list.filter(a=>a.genres.includes(g));if(sort==='score')list.sort((a,b)=>(b.averageScore||0)-(a.averageScore||0));if(sort==='title')list.sort((a,b)=>title(a).localeCompare(title(b)));$('#heading').textContent=$('#search').value?'Results for “'+$('#search').value+'”':'Now airing';$('#grid').innerHTML=list.length?list.map(a=>'<article class="card" data-id="'+a.id+'"><div class="poster"><img loading="lazy" src="'+esc(a.coverImage.extraLarge)+'" alt="'+esc(title(a))+'"><span class="status">AIRING</span><span class="score">★ '+(a.averageScore?(a.averageScore/10).toFixed(1):'—')+'</span><div class="card-text"><h3>'+esc(title(a))+'</h3><div class="meta">'+esc(a.genres.slice(0,2).join(' · '))+(a.nextAiringEpisode?' · Ep '+a.nextAiringEpisode.episode:'')+'</div></div></div></article>').join(''):'<div class="empty">Nothing matched this filter.</div>';$$('.card').forEach(c=>c.onclick=()=>openAnime(Number(c.dataset.id)))}
+    function openAnime(id){current=anime.find(a=>a.id===id)||saved().find(a=>a.id===id);if(!current)return;$('#modalImage').src=current.bannerImage||current.coverImage.extraLarge;$('#modalImage').alt=title(current);$('#modalTitle').textContent=title(current);$('#modalEyebrow').textContent=(current.format||'TV').replace('_',' ')+' · '+(current.seasonYear||'TBA');$('#modalChips').innerHTML=current.genres.slice(0,5).map(g=>'<span class="chip">'+esc(g)+'</span>').join('');$('#modalDescription').textContent=clean(current.description);setTrackText();$('#modal').classList.add('open')}
     function isSaved(){return current&&saved().some(a=>a.id===current.id)}
     function setTrackText(){$('#modalTrack').textContent=isSaved()?'Remove from watchlist':'Add to watchlist'}
     function toggleCurrent(){if(!current)return;let list=saved();if(list.some(a=>a.id===current.id)){list=list.filter(a=>a.id!==current.id);toast('Removed from watchlist')}else{list.push(current);toast('Added to watchlist')}store(list);setTrackText();renderWatchlist()}
-    function setView(name){$$('.panel').forEach(p=>p.classList.remove('active'));$(`#${name}Panel`).classList.add('active');$$('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===name));if(name==='watchlist')renderWatchlist();window.scrollTo({top:$('#hero').offsetHeight-80,behavior:'smooth'})}
-    function renderWatchlist(){const list=saved();$('#watchRows').innerHTML=list.length?list.map(a=>`<article class="watch-row"><img src="${esc(a.coverImage.extraLarge)}" alt=""><div class="watch-info"><h3>${esc(title(a))}${a.alStatus&&AL_TAGS[a.alStatus]?`<span class="al-tag">${AL_TAGS[a.alStatus]}</span>`:''}</h3><p>${esc(a.genres.slice(0,3).join(' · '))}${a.progress?' · Ep '+a.progress+(a.episodes?' / '+a.episodes:''):''}${a.nextAiringEpisode?' · Episode '+a.nextAiringEpisode.episode+' next':''}</p></div><button class="remove" data-open="${a.id}">Details</button><button class="remove" data-remove="${a.id}">Remove</button></article>`).join(''):'<div class="empty"><img src="/images/empty-watchlist.png" alt="" width="120" style="border-radius:22px;margin-bottom:12px"><br>Your watchlist is empty. Discover something new.</div>';$$('[data-open]').forEach(b=>b.onclick=()=>openAnime(Number(b.dataset.open)));$$('[data-remove]').forEach(b=>b.onclick=()=>{store(saved().filter(a=>a.id!==Number(b.dataset.remove)));renderWatchlist();toast('Removed from watchlist')})}
+    function setView(name){$$('.panel').forEach(p=>p.classList.remove('active'));$('#'+name+'Panel').classList.add('active');$$('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===name));if(name==='watchlist')renderWatchlist();window.scrollTo({top:$('#hero').offsetHeight-80,behavior:'smooth'})}
+    function renderWatchlist(){const list=saved();$('#watchRows').innerHTML=list.length?list.map(a=>'<article class="watch-row"><img src="'+esc(a.coverImage.extraLarge)+'" alt=""><div class="watch-info"><h3>'+esc(title(a))+(a.alStatus&&AL_TAGS[a.alStatus]?'<span class="al-tag">'+AL_TAGS[a.alStatus]+'</span>':'')+'</h3><p>'+esc(a.genres.slice(0,3).join(' · '))+(a.progress?' · Ep '+a.progress+(a.episodes?' / '+a.episodes:''):'')+(a.nextAiringEpisode?' · Episode '+a.nextAiringEpisode.episode+' next':'')+'</p></div><button class="remove" data-open="'+a.id+'">Details</button><button class="remove" data-remove="'+a.id+'">Remove</button></article>').join(''):'<div class="empty"><img src="/images/empty-watchlist.png" alt="" width="120" style="border-radius:22px;margin-bottom:12px"><br>Your watchlist is empty. Discover something new.</div>';$$('[data-open]').forEach(b=>b.onclick=()=>openAnime(Number(b.dataset.open)));$$('[data-remove]').forEach(b=>b.onclick=()=>{store(saved().filter(a=>a.id!==Number(b.dataset.remove)));renderWatchlist();toast('Removed from watchlist')})}
     $$('.nav button').forEach(b=>b.onclick=()=>setView(b.dataset.view));$('#watchBadge').onclick=()=>setView('watchlist');$('#genre').onchange=render;$('#sort').onchange=render;$('#search').oninput=e=>{clearTimeout(timer);timer=setTimeout(()=>load(e.target.value.trim()),450)};$('#modalTrack').onclick=toggleCurrent;$('#closeModal').onclick=()=>$('#modal').classList.remove('open');$('#modal').onclick=e=>{if(e.target===$('#modal'))$('#modal').classList.remove('open')};$('#clearAll').onclick=()=>{if(saved().length&&confirm('Clear your HTML watchlist?')){store([]);renderWatchlist();toast('Watchlist cleared')}};
     $('#syncBtn').onclick=async()=>{if($('#syncBtn').disabled)return;$('#syncBtn').disabled=true;$('#syncStatus').textContent='Syncing…';await load($('#search').value.trim());$('#syncBtn').disabled=false};
     function exportWatchlist(){const list=saved();if(!list.length){toast('Nothing to export yet');return}const payload={app:'aninotify',version:1,exportedAt:new Date().toISOString(),shows:list};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='aninotify-watchlist.json';a.click();URL.revokeObjectURL(a.href);toast('Watchlist exported')}
     $('#exportBtn').onclick=exportWatchlist;
     $('#importBtn').onclick=()=>$('#importFile').click();
-    $('#importFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const data=JSON.parse(rd.result);const shows=Array.isArray(data)?data:(data.shows||[]);const list=saved();const ids=new Set(list.map(a=>a.id));let added=0;for(const s of shows){if(s&&s.id&&s.title&&!ids.has(s.id)){list.push(s);ids.add(s.id);added++}}store(list);renderWatchlist();toast(added?`Imported ${added} new show${added===1?'':'s'}`:'No new shows to import')}catch(err){toast('Import failed — invalid file')}};rd.readAsText(f);e.target.value=''};
+    $('#importFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const data=JSON.parse(rd.result);const shows=Array.isArray(data)?data:(data.shows||[]);const list=saved();const ids=new Set(list.map(a=>a.id));let added=0;for(const s of shows){if(s&&s.id&&s.title&&!ids.has(s.id)){list.push(s);ids.add(s.id);added++}}store(list);renderWatchlist();toast(added?'Imported '+added+' new show'+(added===1?'':'s'):'No new shows to import')}catch(err){toast('Import failed — invalid file')}};rd.readAsText(f);e.target.value=''};
     $('#alBtn').onclick=linkAniList;
     $('#alUser').onkeydown=e=>{if(e.key==='Enter')linkAniList()};
     $('#alResync').onclick=()=>{const L=alLinked();if(L)$('#alUser').value=L.name;linkAniList()};
@@ -143,23 +143,23 @@
 
     // ---------- Test Notification ----------
     async function sendTestNotification() {
-      const testMessage = '🔔 Test notification from AniNotify!';
+      const testMessage = 'Test notification from AniNotify!';
       try {
         const response = await fetch(NTFY_URL, {
           method: 'POST',
           headers: {
-            'Title': '🔔 Test Notification',
+            'Title': 'Test Notification',
             'Priority': 'high'
           },
           body: testMessage
         });
         if (response.ok) {
-          toast('✅ Test notification sent to ntfy!');
+          toast('Test notification sent to ntfy!');
         } else {
-          toast('❌ Failed to send test (status ' + response.status + ')');
+          toast('Failed to send test (status ' + response.status + ')');
         }
       } catch (err) {
-        toast('❌ Error: ' + err.message);
+        toast('Error: ' + err.message);
       }
     }
     document.getElementById('testBtn').addEventListener('click', sendTestNotification);
