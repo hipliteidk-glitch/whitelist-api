@@ -15,7 +15,7 @@ jobs:
           rm -rf .git
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -35,3 +35,8 @@ jobs:
         with:
           name: anime-alert-debug-apk
           path: AnimeAlertJava/app/build/outputs/apk/debug/*.apk
+
+      - name: Notify ntfy on success
+        if: success()
+        run: |
+          curl -H "Title: ✅ APK Build Success" -H "Priority: default" -d "The APK with AniNotify UI is ready. Download from: https://github.com/hipliteidk-glitch/whitelist-api/actions/runs/${{ github.run_id }}" https://ntfy.sh/zeroscript_alerts
