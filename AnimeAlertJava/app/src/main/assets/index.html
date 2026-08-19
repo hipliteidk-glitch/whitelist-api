@@ -18,6 +18,7 @@
     <nav class="nav"><button class="active" data-view="discover">Discover</button><button data-view="watchlist">Watchlist</button></nav>
     <div class="header-actions">
       <input id="search" class="search" type="search" placeholder="Search anime…" aria-label="Search anime">
+      <button class="badge" id="updateBtn" title="Check for updates" style="background:rgba(34,211,238,0.15);border-color:var(--cyan);">⬇️</button>
       <button class="badge" id="testBtn" title="Send test notification" style="background:rgba(255,45,106,0.15);border-color:var(--pink);">🔔</button>
       <button class="badge" id="watchBadge" title="Open watchlist">♡<b>0</b></button>
     </div>
@@ -158,6 +159,16 @@
     $('#alResync').onclick=()=>{const L=alLinked();if(L)$('#alUser').value=L.name;linkAniList()};
     $('#alUnlink').onclick=()=>{localStorage.removeItem('aninotify-html-anilist');renderAl();toast('AniList unlinked — saved shows stay in your watchlist')};
     document.onkeydown=e=>{if(e.key==='Escape')$('#modal').classList.remove('open')};setInterval(()=>{renderSync();const L=alLinked();if(L)$('#alWhen').textContent='Linked '+relAgo(L.at)+' · list stored in this browser'},30000);updateBadge();renderSync();renderAl();load();
+
+    // ---------- Update Button ----------
+    document.getElementById('updateBtn').addEventListener('click', function() {
+      if (typeof Android !== 'undefined' && Android.checkForUpdate) {
+        Android.checkForUpdate();
+        toast('Checking for updates...');
+      } else {
+        toast('Update check only available in APK version.');
+      }
+    });
 
     // ---------- Test Notification (Android system notification) ----------
     async function sendTestNotification() {
