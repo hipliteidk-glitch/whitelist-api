@@ -21,6 +21,8 @@ import android.app.NotificationManager;
 import android.app.AlertDialog;
 import android.widget.Toast;
 import android.webkit.DownloadListener;
+import android.os.Handler;
+import android.os.Looper;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -35,6 +37,9 @@ public class MainActivity extends AppCompatActivity {
     private WebView webView;
     private static final String UPDATE_URL = "https://raw.githubusercontent.com/hipliteidk-glitch/whitelist-api/main/version.txt";
     private static final String APK_URL = "https://github.com/hipliteidk-glitch/whitelist-api/releases/latest/download/app-release.apk";
+    private int pendingAnimeId = -1;
+    private Handler handler = new Handler(Looper.getMainLooper());
+    private int retryCount = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,7 +67,15 @@ public class MainActivity extends AppCompatActivity {
         webView = new WebView(this);
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setDomStorageEnabled(true);
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                // Page loaded – if we have a pending anime ID, try to open it
+                if (pendingAnimeId > 0) {
+                    openAnimeWithRetry(pendingAnimeId);
+                }
+            }
+        });
         webView.setWebChromeClient(new WebChromeClient());
 
         // Add JavaScript interface for notifications and countdown
@@ -75,6 +88,34 @@ public class MainActivity extends AppCompatActivity {
 
         // Check for updates on startup
         checkForUpdate(false);
+    }
+
+    private void openAnimeWithRetry(int id) {
+        if (retryCount > 5) {
+            // Give up after 5 retries
+            Toast.makeText(this, "Could not open anime details. Please try manually.", Toast.LENGTH_SHORT).show();
+            pendingAnimeId = -1;
+            retryCount = 0;
+            return;
+        }
+        webView.evaluateJavascript("typeof openAnimeById !== 'undefined' && openAnimeById(" + id + ");", result -> {
+            if ("true".equals(result) || "null".equals(result) || result == null) {
+                // Function executed or not available
+                if (result == null || "null".equals(result) || result.isEmpty()) {
+                    // Function not defined yet – retry after delay
+                    retryCount++;
+                    handler.postDelayed(() -> openAnimeWithRetry(id), 500);
+                } else {
+                    // Success
+                    pendingAnimeId = -1;
+                    retryCount = 0;
+                }
+            } else {
+                // Success
+                pendingAnimeId = -1;
+                retryCount = 0;
+            }
+        });
     }
 
     @Override
@@ -92,8 +133,11 @@ public class MainActivity extends AppCompatActivity {
         if (intent != null && intent.hasExtra("anime_id")) {
             int animeId = intent.getIntExtra("anime_id", -1);
             if (animeId > 0) {
-                final int id = animeId;
-                webView.post(() -> webView.evaluateJavascript("openAnimeById(" + id + ");", null));
+                pendingAnimeId = animeId;
+                // If WebView is already loaded, try to open immediately
+                if (webView != null && webView.getProgress() == 100) {
+                    openAnimeWithRetry(animeId);
+                }
                 intent.removeExtra("anime_id");
             }
         }
@@ -111,7 +155,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Stop the floating service when app is closed
         Intent serviceIntent = new Intent(this, FloatingAlertService.class);
         stopService(serviceIntent);
     }
