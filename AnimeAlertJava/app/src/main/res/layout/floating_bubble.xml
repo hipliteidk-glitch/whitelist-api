@@ -4,7 +4,10 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bubble_background"
-    android:padding="6dp 8dp"
+    android:paddingLeft="8dp"
+    android:paddingRight="8dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp"
     android:gravity="center"
     android:elevation="8dp"
     android:minWidth="56dp">
