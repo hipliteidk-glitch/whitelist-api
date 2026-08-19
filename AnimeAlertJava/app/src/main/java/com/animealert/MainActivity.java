@@ -62,6 +62,30 @@ public class MainActivity extends AppCompatActivity {
         setContentView(webView);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Clear the counter when app is opened (user has seen notifications)
+        SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
+        int count = prefs.getInt("new_episodes_count", 0);
+        if (count > 0) {
+            prefs.edit().putInt("new_episodes_count", 0).apply();
+        }
+
+        // Check if we were opened from the overlay with a specific anime ID
+        Intent intent = getIntent();
+        if (intent != null && intent.hasExtra("anime_id")) {
+            int animeId = intent.getIntExtra("anime_id", -1);
+            if (animeId > 0) {
+                // Call JavaScript to open the anime detail
+                final int id = animeId;
+                webView.post(() -> webView.evaluateJavascript("openAnimeById(" + id + ");", null));
+                // Remove the extra so we don't open it again on subsequent resumes
+                intent.removeExtra("anime_id");
+            }
+        }
+    }
+
     private void startFloatingService() {
         Intent serviceIntent = new Intent(this, FloatingAlertService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -77,17 +101,6 @@ public class MainActivity extends AppCompatActivity {
         // Stop the floating service when app is closed
         Intent serviceIntent = new Intent(this, FloatingAlertService.class);
         stopService(serviceIntent);
-    }
-
-    // Clear the counter when app is opened (user has seen notifications)
-    @Override
-    protected void onResume() {
-        super.onResume();
-        SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
-        int count = prefs.getInt("new_episodes_count", 0);
-        if (count > 0) {
-            prefs.edit().putInt("new_episodes_count", 0).apply();
-        }
     }
 
     private class WebAppInterface {
@@ -111,10 +124,11 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @JavascriptInterface
-        public void setCountdownTarget(long timestamp, String title) {
+        public void setCountdownTarget(long timestamp, String title, int animeId) {
             SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
             prefs.edit().putLong("countdown_target", timestamp)
                  .putString("countdown_title", title)
+                 .putInt("countdown_anime_id", animeId)
                  .apply();
         }
     }

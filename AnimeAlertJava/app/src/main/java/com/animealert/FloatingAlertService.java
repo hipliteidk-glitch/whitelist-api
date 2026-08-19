@@ -35,6 +35,7 @@ public class FloatingAlertService extends Service {
     private Runnable updateRunnable;
     private long countdownTarget = 0;
     private String countdownTitle = "";
+    private int countdownAnimeId = -1;
     private boolean isCountdownMode = false;
 
     @Override
@@ -141,7 +142,11 @@ public class FloatingAlertService extends Service {
                                 if (latest != null && !latest.isEmpty()) {
                                     Toast.makeText(FloatingAlertService.this, latest, Toast.LENGTH_LONG).show();
                                 }
+                                // Open MainActivity with the anime ID if in countdown mode
                                 Intent intent = new Intent(FloatingAlertService.this, MainActivity.class);
+                                if (isCountdownMode && countdownAnimeId > 0) {
+                                    intent.putExtra("anime_id", countdownAnimeId);
+                                }
                                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                                 startActivity(intent);
                             }
@@ -160,6 +165,7 @@ public class FloatingAlertService extends Service {
         SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
         countdownTarget = prefs.getLong("countdown_target", 0);
         countdownTitle = prefs.getString("countdown_title", "");
+        countdownAnimeId = prefs.getInt("countdown_anime_id", -1);
         isCountdownMode = countdownTarget > System.currentTimeMillis();
         if (!isCountdownMode && countdownTarget > 0) {
             prefs.edit().putLong("countdown_target", 0).apply();

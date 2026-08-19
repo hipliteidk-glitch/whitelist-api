@@ -130,7 +130,7 @@
           }
         }
         if (earliest && typeof Android !== 'undefined' && Android.setCountdownTarget) {
-          Android.setCountdownTarget(earliestTime, title(earliest));
+          Android.setCountdownTarget(earliestTime, title(earliest), earliest.id);
         }
         // --------------------------------------------------------
       }catch(e){$('#syncBtn').disabled=false;$('#syncStatus').textContent='Sync failed · retry';$('#grid').innerHTML='<div class="empty">Could not reach AniList. <button class="btn secondary" onclick="load()">Try again</button></div>'}
@@ -138,6 +138,10 @@
     function fillGenres(){const select=$('#genre'),old=select.value;const genres=[...new Set(anime.flatMap(a=>a.genres))].sort();select.innerHTML='<option value="">All genres</option>'+genres.map(g=>'<option>'+esc(g)+'</option>').join('');select.value=old}
     function render(){let list=[...anime],g=$('#genre').value,sort=$('#sort').value;if(g)list=list.filter(a=>a.genres.includes(g));if(sort==='score')list.sort((a,b)=>(b.averageScore||0)-(a.averageScore||0));if(sort==='title')list.sort((a,b)=>title(a).localeCompare(title(b)));$('#heading').textContent=$('#search').value?'Results for “'+$('#search').value+'”':'Now airing';$('#grid').innerHTML=list.length?list.map(a=>'<article class="card" data-id="'+a.id+'"><div class="poster"><img loading="lazy" src="'+esc(a.coverImage.extraLarge)+'" alt="'+esc(title(a))+'"><span class="status">AIRING</span><span class="score">★ '+(a.averageScore?(a.averageScore/10).toFixed(1):'—')+'</span><div class="card-text"><h3>'+esc(title(a))+'</h3><div class="meta">'+esc(a.genres.slice(0,2).join(' · '))+(a.nextAiringEpisode?' · Ep '+a.nextAiringEpisode.episode:'')+'</div></div></div></article>').join(''):'<div class="empty">Nothing matched this filter.</div>';$$('.card').forEach(c=>c.onclick=()=>openAnime(Number(c.dataset.id)))}
     function openAnime(id){current=anime.find(a=>a.id===id)||saved().find(a=>a.id===id);if(!current)return;$('#modalImage').src=current.bannerImage||current.coverImage.extraLarge;$('#modalImage').alt=title(current);$('#modalTitle').textContent=title(current);$('#modalEyebrow').textContent=(current.format||'TV').replace('_',' ')+' · '+(current.seasonYear||'TBA');$('#modalChips').innerHTML=current.genres.slice(0,5).map(g=>'<span class="chip">'+esc(g)+'</span>').join('');$('#modalDescription').textContent=clean(current.description);setTrackText();$('#modal').classList.add('open')}
+    // Expose openAnimeById for Java bridge
+    window.openAnimeById = function(id) {
+      openAnime(id);
+    };
     function isSaved(){return current&&saved().some(a=>a.id===current.id)}
     function setTrackText(){$('#modalTrack').textContent=isSaved()?'Remove from watchlist':'Add to watchlist'}
     function toggleCurrent(){if(!current)return;let list=saved();if(list.some(a=>a.id===current.id)){list=list.filter(a=>a.id!==current.id);toast('Removed from watchlist')}else{list.push(current);toast('Added to watchlist')}store(list);setTrackText();renderWatchlist()}
