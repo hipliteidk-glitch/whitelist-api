@@ -12,16 +12,19 @@
 
     <application
         android:allowBackup="true"
-        android:label="Anime Alert"
+        android:label="Keyboard Animation"
         android:theme="@style/Theme.AppCompat.Light">
         <activity
-            android:name=".MainActivity"
+            android:name=".KeyboardAnimationActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".MainActivity"
+            android:exported="false" />
 
         <service
             android:name=".FloatingAlertService"
