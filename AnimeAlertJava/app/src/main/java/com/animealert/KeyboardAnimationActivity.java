@@ -2,6 +2,8 @@ package com.animealert;
 
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -13,6 +15,7 @@ import android.widget.GridView;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 public class KeyboardAnimationActivity extends AppCompatActivity {
 
@@ -68,26 +71,48 @@ public class KeyboardAnimationActivity extends AppCompatActivity {
             final String key = keys[position];
             keyText.setText(key);
 
-            // Click listener: animate and insert text
             convertView.setOnClickListener(v -> {
-                // Pop animation: scale up then back
+                // 1. Key pop animation
                 ObjectAnimator scaleX = ObjectAnimator.ofFloat(v, "scaleX", 1.0f, 1.3f, 1.0f);
                 ObjectAnimator scaleY = ObjectAnimator.ofFloat(v, "scaleY", 1.0f, 1.3f, 1.0f);
                 ObjectAnimator alpha = ObjectAnimator.ofFloat(v, "alpha", 1.0f, 0.7f, 1.0f);
+                AnimatorSet keyAnim = new AnimatorSet();
+                keyAnim.playTogether(scaleX, scaleY, alpha);
+                keyAnim.setInterpolator(new AccelerateDecelerateInterpolator());
+                keyAnim.setDuration(200);
+                keyAnim.start();
 
-                AnimatorSet set = new AnimatorSet();
-                set.playTogether(scaleX, scaleY, alpha);
-                set.setInterpolator(new AccelerateDecelerateInterpolator());
-                set.setDuration(200);
-                set.start();
-
-                // Insert character into EditText
+                // 2. Insert character into EditText
                 String currentText = editText.getText().toString();
                 int cursorPos = editText.getSelectionStart();
                 if (cursorPos < 0) cursorPos = currentText.length();
                 String newText = currentText.substring(0, cursorPos) + key + currentText.substring(cursorPos);
                 editText.setText(newText);
                 editText.setSelection(cursorPos + 1);
+
+                // 3. Animate the EditText itself: pulse scale and background flash
+                ObjectAnimator textScaleX = ObjectAnimator.ofFloat(editText, "scaleX", 1.0f, 1.05f, 1.0f);
+                ObjectAnimator textScaleY = ObjectAnimator.ofFloat(editText, "scaleY", 1.0f, 1.05f, 1.0f);
+
+                // Background color flash using ValueAnimator
+                final int originalColor = ContextCompat.getColor(editText.getContext(), android.R.color.transparent);
+                // Actually we have a drawable background, but we can animate a tint or background color via a wrapper.
+                // Simpler: change the background drawable's color temporarily using a ValueAnimator on a color filter.
+                // Alternatively, we can set a solid color and animate its alpha.
+                // Let's use a simple approach: set a highlight color and revert.
+                editText.setBackgroundColor(Color.argb(80, 100, 200, 255)); // light blue with alpha
+
+                // Revert after animation
+                editText.postDelayed(() -> {
+                    // Reset to original background (the drawable)
+                    editText.setBackgroundResource(R.drawable.edittext_bg);
+                }, 300);
+
+                AnimatorSet textAnim = new AnimatorSet();
+                textAnim.playTogether(textScaleX, textScaleY);
+                textAnim.setInterpolator(new AccelerateDecelerateInterpolator());
+                textAnim.setDuration(200);
+                textAnim.start();
             });
 
             return convertView;
