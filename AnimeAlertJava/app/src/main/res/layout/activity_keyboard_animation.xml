@@ -4,15 +4,28 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#1a1a2e"
-    android:gravity="center">
+    android:padding="16dp">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Keyboard Animation"
+        android:text="Keyboard Animation Demo"
         android:textSize="24sp"
         android:textColor="#ffffff"
-        android:layout_marginBottom="32dp"/>
+        android:layout_gravity="center"
+        android:layout_marginBottom="16dp"/>
+
+    <EditText
+        android:id="@+id/editText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Type here using the keys below"
+        android:textColorHint="#aaaaaa"
+        android:textColor="#ffffff"
+        android:background="@drawable/edittext_bg"
+        android:padding="12dp"
+        android:textSize="18sp"
+        android:layout_marginBottom="24dp"/>
 
     <GridView
         android:id="@+id/keyboardGrid"
@@ -21,7 +34,6 @@
         android:numColumns="4"
         android:verticalSpacing="16dp"
         android:horizontalSpacing="16dp"
-        android:padding="16dp"
         android:stretchMode="columnWidth"
         android:gravity="center"/>
 
