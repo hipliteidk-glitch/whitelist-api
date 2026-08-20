@@ -14,6 +14,7 @@
         android:allowBackup="true"
         android:label="Keyboard Animation"
         android:theme="@style/Theme.AppCompat.Light">
+
         <activity
             android:name=".KeyboardAnimationActivity"
             android:exported="true">
@@ -22,6 +23,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
         <activity
             android:name=".MainActivity"
             android:exported="false" />
@@ -31,6 +33,20 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="systemExempted" />
+
+        <!-- Keyboard Service -->
+        <service
+            android:name=".KeyboardService"
+            android:label="Key Animation Keyboard"
+            android:permission="android.permission.BIND_INPUT_METHOD"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"
