@@ -1,5 +1,6 @@
 package com.animealert;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -15,28 +16,36 @@ import android.webkit.WebChromeClient;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.AlertDialog;
 import android.widget.Toast;
-import android.webkit.DownloadListener;
 import android.os.Handler;
 import android.os.Looper;
+
+import androidx.work.Constraints;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.NetworkType;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
     private static final String CHANNEL_ID = "anime_alerts";
     private static final String CHANNEL_NAME = "Anime Alerts";
     private static final int OVERLAY_PERMISSION_REQUEST = 1001;
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 1002;
     private WebView webView;
     private static final String UPDATE_URL = "https://raw.githubusercontent.com/hipliteidk-glitch/whitelist-api/main/version.txt";
-    private static final String APK_URL = "https://github.com/hipliteidk-glitch/whitelist-api/releases/latest/download/app-release.apk";
     private int pendingAnimeId = -1;
     private Handler handler = new Handler(Looper.getMainLooper());
     private int retryCount = 0;
@@ -45,7 +54,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Create notification channel (for Android 8+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH);
             NotificationManager manager = getSystemService(NotificationManager.class);
@@ -54,10 +62,9 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // Start the floating overlay service
+        requestNotificationPermission();
         startFloatingService();
 
-        // Request overlay permission if needed
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:" + getPackageName()));
@@ -70,29 +77,51 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
-                // Page loaded – if we have a pending anime ID, try to open it
                 if (pendingAnimeId > 0) {
                     openAnimeWithRetry(pendingAnimeId);
                 }
             }
         });
         webView.setWebChromeClient(new WebChromeClient());
-
-        // Add JavaScript interface for notifications and countdown
         webView.addJavascriptInterface(new WebAppInterface(), "Android");
-
-        // Load the new AniNotify HTML from assets
         webView.loadUrl("file:///android_asset/index.html");
-
         setContentView(webView);
 
-        // Check for updates on startup
+        handleAnimeIntent(getIntent());
+        scheduleWatchlistChecks();
         checkForUpdate(false);
+    }
+
+    private void scheduleWatchlistChecks() {
+        Constraints net = new Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build();
+        PeriodicWorkRequest periodic = new PeriodicWorkRequest.Builder(
+                AnimeCheckWorker.class, 15, TimeUnit.MINUTES)
+                .setConstraints(net)
+                .build();
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "anime_watchlist_check",
+                ExistingPeriodicWorkPolicy.KEEP,
+                periodic);
+        WorkManager.getInstance(this).enqueue(
+                new OneTimeWorkRequest.Builder(AnimeCheckWorker.class)
+                        .setConstraints(net)
+                        .build());
+    }
+
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        NOTIFICATION_PERMISSION_REQUEST);
+            }
+        }
     }
 
     private void openAnimeWithRetry(int id) {
         if (retryCount > 5) {
-            // Give up after 5 retries
             Toast.makeText(this, "Could not open anime details. Please try manually.", Toast.LENGTH_SHORT).show();
             pendingAnimeId = -1;
             retryCount = 0;
@@ -100,18 +129,14 @@ public class MainActivity extends AppCompatActivity {
         }
         webView.evaluateJavascript("typeof openAnimeById !== 'undefined' && openAnimeById(" + id + ");", result -> {
             if ("true".equals(result) || "null".equals(result) || result == null) {
-                // Function executed or not available
                 if (result == null || "null".equals(result) || result.isEmpty()) {
-                    // Function not defined yet – retry after delay
                     retryCount++;
                     handler.postDelayed(() -> openAnimeWithRetry(id), 500);
                 } else {
-                    // Success
                     pendingAnimeId = -1;
                     retryCount = 0;
                 }
             } else {
-                // Success
                 pendingAnimeId = -1;
                 retryCount = 0;
             }
@@ -119,22 +144,29 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleAnimeIntent(intent);
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
-        // Clear the counter when app is opened (user has seen notifications)
         SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
         int count = prefs.getInt("new_episodes_count", 0);
         if (count > 0) {
             prefs.edit().putInt("new_episodes_count", 0).apply();
         }
+        handleAnimeIntent(getIntent());
+    }
 
-        // Check if we were opened from the overlay with a specific anime ID
-        Intent intent = getIntent();
+    private void handleAnimeIntent(Intent intent) {
         if (intent != null && intent.hasExtra("anime_id")) {
             int animeId = intent.getIntExtra("anime_id", -1);
             if (animeId > 0) {
                 pendingAnimeId = animeId;
-                // If WebView is already loaded, try to open immediately
+                retryCount = 0;
                 if (webView != null && webView.getProgress() == 100) {
                     openAnimeWithRetry(animeId);
                 }
@@ -149,6 +181,15 @@ public class MainActivity extends AppCompatActivity {
             startForegroundService(serviceIntent);
         } else {
             startService(serviceIntent);
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
         }
     }
 
@@ -200,9 +241,6 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(this, "Downloading update...", Toast.LENGTH_LONG).show();
         new Thread(() -> {
             try {
-                URL url = new URL("https://github.com/hipliteidk-glitch/whitelist-api/actions/runs/latest/artifacts/anime-alert-release-apk");
-                // Fallback to the raw APK URL if the artifact link is not available
-                // We'll use the raw APK from the latest release
                 URL apkUrl = new URL("https://github.com/hipliteidk-glitch/whitelist-api/releases/latest/download/app-release.apk");
                 HttpURLConnection conn = (HttpURLConnection) apkUrl.openConnection();
                 conn.setConnectTimeout(10000);
@@ -264,8 +302,33 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @JavascriptInterface
+        public void clearCountdown() {
+            getSharedPreferences("anime_alert", MODE_PRIVATE)
+                    .edit()
+                    .putLong("countdown_target", 0)
+                    .putString("countdown_title", "")
+                    .putInt("countdown_anime_id", -1)
+                    .apply();
+        }
+
+        @JavascriptInterface
+        public void syncWatchlist(String json) {
+            getSharedPreferences("anime_alert", MODE_PRIVATE)
+                    .edit()
+                    .putString("watchlist_json", json == null ? "[]" : json)
+                    .apply();
+        }
+
+        @JavascriptInterface
         public void checkForUpdate() {
             MainActivity.this.checkForUpdate(true);
+        }
+
+        @JavascriptInterface
+        public void openKeyboardDemo() {
+            runOnUiThread(() -> {
+                startActivity(new Intent(MainActivity.this, KeyboardAnimationActivity.class));
+            });
         }
     }
 }

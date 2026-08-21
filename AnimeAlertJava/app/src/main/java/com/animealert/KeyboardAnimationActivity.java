@@ -2,9 +2,11 @@ package com.animealert;
 
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
-import android.animation.ValueAnimator;
+import android.content.Intent;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,7 +17,6 @@ import android.widget.GridView;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 
 public class KeyboardAnimationActivity extends AppCompatActivity {
 
@@ -29,9 +30,22 @@ public class KeyboardAnimationActivity extends AppCompatActivity {
         setContentView(R.layout.activity_keyboard_animation);
 
         editText = findViewById(R.id.editText);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            editText.setShowSoftInputOnFocus(false);
+        }
         keyboardGrid = findViewById(R.id.keyboardGrid);
         adapter = new KeyAdapter();
         keyboardGrid.setAdapter(adapter);
+
+        findViewById(R.id.backButton).setOnClickListener(v -> finish());
+        findViewById(R.id.enableImeButton).setOnClickListener(v ->
+                startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)));
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
     }
 
     private class KeyAdapter extends BaseAdapter {
@@ -72,7 +86,6 @@ public class KeyboardAnimationActivity extends AppCompatActivity {
             keyText.setText(key);
 
             convertView.setOnClickListener(v -> {
-                // 1. Key pop animation
                 ObjectAnimator scaleX = ObjectAnimator.ofFloat(v, "scaleX", 1.0f, 1.3f, 1.0f);
                 ObjectAnimator scaleY = ObjectAnimator.ofFloat(v, "scaleY", 1.0f, 1.3f, 1.0f);
                 ObjectAnimator alpha = ObjectAnimator.ofFloat(v, "alpha", 1.0f, 0.7f, 1.0f);
@@ -82,7 +95,6 @@ public class KeyboardAnimationActivity extends AppCompatActivity {
                 keyAnim.setDuration(200);
                 keyAnim.start();
 
-                // 2. Insert character into EditText
                 String currentText = editText.getText().toString();
                 int cursorPos = editText.getSelectionStart();
                 if (cursorPos < 0) cursorPos = currentText.length();
@@ -90,21 +102,11 @@ public class KeyboardAnimationActivity extends AppCompatActivity {
                 editText.setText(newText);
                 editText.setSelection(cursorPos + 1);
 
-                // 3. Animate the EditText itself: pulse scale and background flash
                 ObjectAnimator textScaleX = ObjectAnimator.ofFloat(editText, "scaleX", 1.0f, 1.05f, 1.0f);
                 ObjectAnimator textScaleY = ObjectAnimator.ofFloat(editText, "scaleY", 1.0f, 1.05f, 1.0f);
 
-                // Background color flash using ValueAnimator
-                final int originalColor = ContextCompat.getColor(editText.getContext(), android.R.color.transparent);
-                // Actually we have a drawable background, but we can animate a tint or background color via a wrapper.
-                // Simpler: change the background drawable's color temporarily using a ValueAnimator on a color filter.
-                // Alternatively, we can set a solid color and animate its alpha.
-                // Let's use a simple approach: set a highlight color and revert.
-                editText.setBackgroundColor(Color.argb(80, 100, 200, 255)); // light blue with alpha
-
-                // Revert after animation
+                editText.setBackgroundColor(Color.argb(80, 100, 200, 255));
                 editText.postDelayed(() -> {
-                    // Reset to original background (the drawable)
                     editText.setBackgroundResource(R.drawable.edittext_bg);
                 }, 300);
 
