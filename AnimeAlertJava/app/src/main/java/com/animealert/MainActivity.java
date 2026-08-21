@@ -25,11 +25,19 @@ import android.widget.Toast;
 import android.os.Handler;
 import android.os.Looper;
 
+import androidx.work.Constraints;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.NetworkType;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
     private static final String CHANNEL_ID = "anime_alerts";
@@ -80,7 +88,26 @@ public class MainActivity extends AppCompatActivity {
         setContentView(webView);
 
         handleAnimeIntent(getIntent());
+        scheduleWatchlistChecks();
         checkForUpdate(false);
+    }
+
+    private void scheduleWatchlistChecks() {
+        Constraints net = new Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build();
+        PeriodicWorkRequest periodic = new PeriodicWorkRequest.Builder(
+                AnimeCheckWorker.class, 15, TimeUnit.MINUTES)
+                .setConstraints(net)
+                .build();
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "anime_watchlist_check",
+                ExistingPeriodicWorkPolicy.KEEP,
+                periodic);
+        WorkManager.getInstance(this).enqueue(
+                new OneTimeWorkRequest.Builder(AnimeCheckWorker.class)
+                        .setConstraints(net)
+                        .build());
     }
 
     private void requestNotificationPermission() {
@@ -272,6 +299,24 @@ public class MainActivity extends AppCompatActivity {
                  .putString("countdown_title", title)
                  .putInt("countdown_anime_id", animeId)
                  .apply();
+        }
+
+        @JavascriptInterface
+        public void clearCountdown() {
+            getSharedPreferences("anime_alert", MODE_PRIVATE)
+                    .edit()
+                    .putLong("countdown_target", 0)
+                    .putString("countdown_title", "")
+                    .putInt("countdown_anime_id", -1)
+                    .apply();
+        }
+
+        @JavascriptInterface
+        public void syncWatchlist(String json) {
+            getSharedPreferences("anime_alert", MODE_PRIVATE)
+                    .edit()
+                    .putString("watchlist_json", json == null ? "[]" : json)
+                    .apply();
         }
 
         @JavascriptInterface

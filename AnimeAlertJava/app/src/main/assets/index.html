@@ -72,7 +72,7 @@
     const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
     let anime=[], current=null, timer=null;
     const saved=()=>JSON.parse(localStorage.getItem('aninotify-html-watchlist')||'[]');
-    const store=list=>{localStorage.setItem('aninotify-html-watchlist',JSON.stringify(list));updateBadge()};
+    const store=list=>{localStorage.setItem('aninotify-html-watchlist',JSON.stringify(list));updateBadge();syncNativeWatchlist(list);updateAlertsFromWatchlist()};
     const syncMeta=()=>JSON.parse(localStorage.getItem('aninotify-html-sync')||'null');
     function markSync(n){localStorage.setItem('aninotify-html-sync',JSON.stringify({at:Date.now(),count:n}));renderSync()}
     function renderSync(){const el=$('#syncStatus');if(!el)return;const m=syncMeta();if(!m){el.textContent='Not synced yet';return}const s=Math.max(0,Math.floor((Date.now()-m.at)/1000));const ago=s<10?'just now':s<60?s+'s ago':s<3600?Math.floor(s/60)+'m ago':s<86400?Math.floor(s/3600)+'h ago':Math.floor(s/86400)+'d ago';el.textContent='Updated '+ago+' · '+m.count+' titles'}
@@ -116,25 +116,39 @@
     function clean(s){return (s||'No synopsis available.').replace(/<[^>]+>/g,'').replace(/\n/g,' ').slice(0,650)}
     function updateBadge(){const n=saved().length;$('#watchBadge b').textContent=n}
     function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+    function syncNativeWatchlist(list){if(typeof Android!=='undefined'&&Android.syncWatchlist)Android.syncWatchlist(JSON.stringify(list||saved()))}
+    function updateAlertsFromWatchlist(){
+      const list=saved();
+      const now=Date.now();
+      let earliest=null,earliestTime=Infinity;
+      for(const a of list){
+        const nae=a.nextAiringEpisode;
+        if(!nae||!nae.airingAt) continue;
+        const time=nae.airingAt*1000;
+        if(time>now && time<earliestTime){earliestTime=time;earliest=a;}
+      }
+      if(typeof Android==='undefined') return;
+      if(earliest && Android.setCountdownTarget) Android.setCountdownTarget(earliestTime,title(earliest),earliest.id);
+      else if(Android.clearCountdown) Android.clearCountdown();
+    }
+    function refreshWatchlistFromCatalog(){
+      const list=saved();
+      const byId={};
+      for(const a of anime) byId[a.id]=a;
+      let changed=false;
+      for(const w of list){
+        const c=byId[w.id];
+        if(c && c.nextAiringEpisode){w.nextAiringEpisode=c.nextAiringEpisode;changed=true;}
+      }
+      if(changed) localStorage.setItem('aninotify-html-watchlist',JSON.stringify(list));
+      syncNativeWatchlist(list);
+      updateAlertsFromWatchlist();
+    }
     async function load(search=''){
       $('#grid').innerHTML='<div class="loading"><div class="spinner"></div>Calling AniList…</div>';
       try{const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({query:QUERY,variables:{search:search||null}})});if(!r.ok)throw new Error('AniList unavailable');const j=await r.json();anime=j.data.Page.media||[];markSync(anime.length);fillGenres();render();
-        // -------- Set countdown for the soonest airing ----------
-        let earliest = null;
-        let earliestTime = Infinity;
-        for (const a of anime) {
-          if (a.nextAiringEpisode && a.nextAiringEpisode.airingAt) {
-            const time = a.nextAiringEpisode.airingAt * 1000;
-            if (time < earliestTime) {
-              earliestTime = time;
-              earliest = a;
-            }
-          }
-        }
-        if (earliest && typeof Android !== 'undefined' && Android.setCountdownTarget) {
-          Android.setCountdownTarget(earliestTime, title(earliest), earliest.id);
-        }
-        // --------------------------------------------------------
+        // Alerts/countdown only for watchlist titles — never the Discover catalog
+        refreshWatchlistFromCatalog();
       }catch(e){$('#syncBtn').disabled=false;$('#syncStatus').textContent='Sync failed · retry';$('#grid').innerHTML='<div class="empty">Could not reach AniList. <button class="btn secondary" onclick="load()">Try again</button></div>'}
     }
     function fillGenres(){const select=$('#genre'),old=select.value;const genres=[...new Set(anime.flatMap(a=>a.genres))].sort();select.innerHTML='<option value="">All genres</option>'+genres.map(g=>'<option>'+esc(g)+'</option>').join('');select.value=old}
@@ -159,7 +173,7 @@
     $('#alUser').onkeydown=e=>{if(e.key==='Enter')linkAniList()};
     $('#alResync').onclick=()=>{const L=alLinked();if(L)$('#alUser').value=L.name;linkAniList()};
     $('#alUnlink').onclick=()=>{localStorage.removeItem('aninotify-html-anilist');renderAl();toast('AniList unlinked — saved shows stay in your watchlist')};
-    document.onkeydown=e=>{if(e.key==='Escape')$('#modal').classList.remove('open')};setInterval(()=>{renderSync();const L=alLinked();if(L)$('#alWhen').textContent='Linked '+relAgo(L.at)+' · list stored in this browser'},30000);updateBadge();renderSync();renderAl();load();
+    document.onkeydown=e=>{if(e.key==='Escape')$('#modal').classList.remove('open')};setInterval(()=>{renderSync();const L=alLinked();if(L)$('#alWhen').textContent='Linked '+relAgo(L.at)+' · list stored in this browser'},30000);updateBadge();renderSync();renderAl();syncNativeWatchlist(saved());updateAlertsFromWatchlist();load();
 
     // ---------- Update Button ----------
     document.getElementById('updateBtn').addEventListener('click', function() {
