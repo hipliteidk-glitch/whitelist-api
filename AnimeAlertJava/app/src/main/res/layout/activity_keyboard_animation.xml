@@ -6,35 +6,87 @@
     android:background="#1a1a2e"
     android:padding="16dp">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Keyboard Animation Demo"
-        android:textSize="24sp"
-        android:textColor="#ffffff"
-        android:layout_gravity="center"
-        android:layout_marginBottom="16dp"/>
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:id="@+id/backButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/keyboard_back"
+            android:textSize="16sp"
+            android:textColor="#7c5cff"
+            android:padding="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/keyboard_demo_title"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#ffffff"
+            android:gravity="center" />
+
+        <View
+            android:layout_width="56dp"
+            android:layout_height="1dp" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/keyboard_demo_subtitle"
+        android:textSize="13sp"
+        android:textColor="#aaaaaa"
+        android:gravity="center"
+        android:layout_marginBottom="12dp" />
 
     <EditText
         android:id="@+id/editText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Type here using the keys below"
+        android:hint="@string/keyboard_demo_hint"
         android:textColorHint="#aaaaaa"
         android:textColor="#ffffff"
         android:background="@drawable/edittext_bg"
         android:padding="12dp"
         android:textSize="18sp"
-        android:layout_marginBottom="24dp"/>
+        android:inputType="text"
+        android:importantForAutofill="no"
+        android:layout_marginBottom="12dp" />
+
+    <TextView
+        android:id="@+id/enableImeButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/keyboard_enable_ime"
+        android:textColor="#ffffff"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:padding="12dp"
+        android:background="@drawable/key_bg"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?android:attr/selectableItemBackground"
+        android:layout_marginBottom="16dp" />
 
     <GridView
         android:id="@+id/keyboardGrid"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:numColumns="4"
         android:verticalSpacing="16dp"
         android:horizontalSpacing="16dp"
         android:stretchMode="columnWidth"
-        android:gravity="center"/>
+        android:gravity="center" />
 
 </LinearLayout>

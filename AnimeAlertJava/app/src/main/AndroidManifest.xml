@@ -12,21 +12,34 @@
 
     <application
         android:allowBackup="true"
-        android:label="Keyboard Animation"
-        android:theme="@style/Theme.AppCompat.Light">
+        android:label="@string/app_name"
+        android:theme="@style/Theme.AnimeAlert"
+        tools:targetApi="34">
 
         <activity
-            android:name=".KeyboardAnimationActivity"
-            android:exported="true">
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
+        <!-- Keyboard animation demo — opened from AniNotify / IME settings, not the launcher -->
         <activity
-            android:name=".MainActivity"
-            android:exported="false" />
+            android:name=".KeyboardAnimationActivity"
+            android:exported="true"
+            android:label="@string/keyboard_demo_title"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Theme.AnimeAlert.Keyboard"
+            android:windowSoftInputMode="stateAlwaysHidden">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.animealert.MainActivity" />
+        </activity>
 
         <service
             android:name=".FloatingAlertService"
@@ -34,10 +47,10 @@
             android:exported="false"
             android:foregroundServiceType="systemExempted" />
 
-        <!-- Keyboard Service -->
+        <!-- Optional IME side feature — enable in system keyboard settings -->
         <service
             android:name=".KeyboardService"
-            android:label="Key Animation Keyboard"
+            android:label="@string/keyboard_ime_name"
             android:permission="android.permission.BIND_INPUT_METHOD"
             android:exported="true">
             <intent-filter>

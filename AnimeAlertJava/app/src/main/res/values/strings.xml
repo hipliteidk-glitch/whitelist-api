@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Anime Alert</string>
+    <string name="keyboard_demo_title">Keyboard Animation</string>
+    <string name="keyboard_ime_name">Anime Alert Keyboard</string>
+    <string name="keyboard_demo_hint">Type here using the keys below</string>
+    <string name="keyboard_enable_ime">Enable as system keyboard</string>
+    <string name="keyboard_back">Back</string>
+    <string name="keyboard_demo_subtitle">Side feature — tap keys to see the textbox pulse. Enable the IME to use it in other apps.</string>
+</resources>

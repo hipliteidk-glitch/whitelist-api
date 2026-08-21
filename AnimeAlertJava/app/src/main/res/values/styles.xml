@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <style name="Theme.AnimeAlert" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:statusBarColor">#07070d</item>
+        <item name="android:navigationBarColor">#07070d</item>
+        <item name="android:windowBackground">#07070d</item>
+        <item name="colorPrimary">#ff2d6a</item>
+        <item name="colorPrimaryDark">#07070d</item>
+        <item name="colorAccent">#7c5cff</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Theme.AnimeAlert.Keyboard" parent="Theme.AnimeAlert">
+        <item name="android:windowBackground">#1a1a2e</item>
+        <item name="android:statusBarColor">#1a1a2e</item>
+    </style>
+
     <style name="KeyStyle">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">48dp</item>

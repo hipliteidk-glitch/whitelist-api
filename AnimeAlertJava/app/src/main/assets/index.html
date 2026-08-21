@@ -20,6 +20,7 @@
       <input id="search" class="search" type="search" placeholder="Search anime…" aria-label="Search anime">
       <button class="badge" id="updateBtn" title="Check for updates" style="background:rgba(34,211,238,0.15);border-color:var(--cyan);">⬇️</button>
       <button class="badge" id="testBtn" title="Send test notification" style="background:rgba(255,45,106,0.15);border-color:var(--pink);">🔔</button>
+      <button class="badge" id="keyboardBtn" title="Keyboard animation demo" style="background:rgba(124,92,255,0.15);border-color:var(--violet);">⌨️</button>
       <button class="badge" id="watchBadge" title="Open watchlist">♡<b>0</b></button>
     </div>
   </div></header>
@@ -190,6 +191,14 @@
       }
     }
     document.getElementById('testBtn').addEventListener('click', sendTestNotification);
+
+    document.getElementById('keyboardBtn').addEventListener('click', function() {
+      if (typeof Android !== 'undefined' && Android.openKeyboardDemo) {
+        Android.openKeyboardDemo();
+      } else {
+        toast('Keyboard demo only available in the app.');
+      }
+    });
   </script>
 </body>
 </html>
