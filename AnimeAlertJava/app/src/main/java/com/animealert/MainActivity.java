@@ -314,7 +314,7 @@ public class MainActivity extends AppCompatActivity {
                         Uri.parse("https://github.com/hipliteidk-glitch/whitelist-api/releases/latest/download/app-release.apk"));
                 startActivity(intent);
             } catch (Exception e) {
-                Toast.makeText(this, "Could not open the download page.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, "Could not open the download page.", Toast.LENGTH_SHORT).show();
             }
         }
 
