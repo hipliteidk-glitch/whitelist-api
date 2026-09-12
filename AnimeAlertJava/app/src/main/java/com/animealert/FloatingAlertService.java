@@ -13,6 +13,8 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.provider.Settings;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -24,6 +26,7 @@ import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
 
 public class FloatingAlertService extends Service {
+    private static final String TAG = "FloatingAlertService";
     private static final String CHANNEL_ID = "floating_overlay_channel";
     private static final int NOTIFICATION_ID = 1001;
     private WindowManager windowManager;
@@ -42,13 +45,40 @@ public class FloatingAlertService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-        startForeground(NOTIFICATION_ID, createNotification());
-        createFloatingView();
-        loadCountdown();
+        try {
+            startForeground(NOTIFICATION_ID, createNotification());
+        } catch (Exception e) {
+            Log.e(TAG, "startForeground failed — stopping service to avoid crash", e);
+            stopSelf();
+            return;
+        }
+
+        // If overlay permission is missing, stay headless: do not create view nor tick.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Log.i(TAG, "canDrawOverlays() false — running headless without floating view");
+            return;
+        }
+
+        try {
+            createFloatingView();
+        } catch (Exception e) {
+            Log.e(TAG, "createFloatingView failed — continuing headless", e);
+        }
+
+        try {
+            loadCountdown();
+        } catch (Exception e) {
+            Log.w(TAG, "loadCountdown failed", e);
+        }
+
         updateRunnable = new Runnable() {
             @Override
             public void run() {
-                updateDisplay();
+                try {
+                    updateDisplay();
+                } catch (Exception e) {
+                    Log.w(TAG, "updateDisplay failed", e);
+                }
                 handler.postDelayed(this, 1000);
             }
         };
@@ -79,8 +109,21 @@ public class FloatingAlertService extends Service {
 
     private void createFloatingView() {
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        if (windowManager == null) {
+            Log.w(TAG, "WindowManager is null, cannot create floating view");
+            return;
+        }
         LayoutInflater inflater = (LayoutInflater) getSystemService(LAYOUT_INFLATER_SERVICE);
-        floatingView = inflater.inflate(R.layout.floating_bubble, null);
+        if (inflater == null) {
+            Log.w(TAG, "LayoutInflater is null");
+            return;
+        }
+        try {
+            floatingView = inflater.inflate(R.layout.floating_bubble, null);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to inflate floating_bubble", e);
+            return;
+        }
         titleText = floatingView.findViewById(R.id.bubble_title);
         countText = floatingView.findViewById(R.id.bubble_count);
 
@@ -117,9 +160,15 @@ public class FloatingAlertService extends Service {
                         initialTouchY = event.getRawY();
                         return true;
                     case MotionEvent.ACTION_MOVE:
-                        params.x = initialX + (int) (event.getRawX() - initialTouchX);
-                        params.y = initialY + (int) (event.getRawY() - initialTouchY);
-                        windowManager.updateViewLayout(floatingView, params);
+                        try {
+                            params.x = initialX + (int) (event.getRawX() - initialTouchX);
+                            params.y = initialY + (int) (event.getRawY() - initialTouchY);
+                            if (windowManager != null && floatingView != null) {
+                                windowManager.updateViewLayout(floatingView, params);
+                            }
+                        } catch (Exception e) {
+                            Log.w(TAG, "updateViewLayout failed", e);
+                        }
                         return true;
                     case MotionEvent.ACTION_UP:
                         float dx = event.getRawX() - initialTouchX;
@@ -128,27 +177,35 @@ public class FloatingAlertService extends Service {
                         if (Math.abs(dx) < 15 && Math.abs(dy) < 15) {
                             if (now - lastTapTime < 400) {
                                 // Double tap: clear countdown and switch to counter mode
-                                SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
-                                prefs.edit().putLong("countdown_target", 0).apply();
-                                loadCountdown();
-                                updateDisplay();
-                                Toast.makeText(FloatingAlertService.this, "Countdown cleared", Toast.LENGTH_SHORT).show();
+                                try {
+                                    SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
+                                    prefs.edit().putLong("countdown_target", 0).apply();
+                                    loadCountdown();
+                                    updateDisplay();
+                                    Toast.makeText(FloatingAlertService.this, "Countdown cleared", Toast.LENGTH_SHORT).show();
+                                } catch (Exception e) {
+                                    Log.w(TAG, "Double tap handling failed", e);
+                                }
                                 lastTapTime = 0;
                             } else {
                                 lastTapTime = now;
                                 // Single tap: show preview and open app
-                                SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
-                                String latest = prefs.getString("latest_episode", null);
-                                if (latest != null && !latest.isEmpty()) {
-                                    Toast.makeText(FloatingAlertService.this, latest, Toast.LENGTH_LONG).show();
+                                try {
+                                    SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
+                                    String latest = prefs.getString("latest_episode", null);
+                                    if (latest != null && !latest.isEmpty()) {
+                                        Toast.makeText(FloatingAlertService.this, latest, Toast.LENGTH_LONG).show();
+                                    }
+                                    // Open MainActivity with the anime ID if in countdown mode
+                                    Intent intent = new Intent(FloatingAlertService.this, MainActivity.class);
+                                    if (isCountdownMode && countdownAnimeId > 0) {
+                                        intent.putExtra("anime_id", countdownAnimeId);
+                                    }
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                    startActivity(intent);
+                                } catch (Exception e) {
+                                    Log.w(TAG, "Single tap handling failed", e);
                                 }
-                                // Open MainActivity with the anime ID if in countdown mode
-                                Intent intent = new Intent(FloatingAlertService.this, MainActivity.class);
-                                if (isCountdownMode && countdownAnimeId > 0) {
-                                    intent.putExtra("anime_id", countdownAnimeId);
-                                }
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                startActivity(intent);
                             }
                         }
                         return true;
@@ -157,8 +214,18 @@ public class FloatingAlertService extends Service {
             }
         });
 
-        windowManager.addView(floatingView, params);
-        updateDisplay();
+        try {
+            windowManager.addView(floatingView, params);
+        } catch (Exception e) {
+            Log.e(TAG, "addView failed — likely overlay permission revoked", e);
+            floatingView = null;
+            return;
+        }
+        try {
+            updateDisplay();
+        } catch (Exception e) {
+            Log.w(TAG, "initial updateDisplay failed", e);
+        }
     }
 
     private void loadCountdown() {
@@ -197,31 +264,43 @@ public class FloatingAlertService extends Service {
     }
 
     private void updateDisplay() {
-        loadCountdown();
+        // Guard: if view was never created (headless mode) skip.
+        if (floatingView == null || titleText == null || countText == null) {
+            return;
+        }
+        try {
+            loadCountdown();
+        } catch (Exception e) {
+            Log.w(TAG, "loadCountdown in updateDisplay failed", e);
+        }
         SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
 
-        if (isCountdownMode && countdownTarget > System.currentTimeMillis()) {
-            long remaining = countdownTarget - System.currentTimeMillis();
-            String timeStr = formatCountdown(remaining);
-            String displayTitle = countdownTitle.isEmpty() ? "Next" : truncateTitle(countdownTitle, 12);
-            titleText.setText(displayTitle);
-            countText.setText(timeStr);
-            floatingView.setVisibility(View.VISIBLE);
-        } else {
-            // Fallback to counter mode
-            int newCount = prefs.getInt("new_episodes_count", 0);
-            if (newCount != count) {
-                count = newCount;
-            }
-            if (count == 0) {
-                titleText.setText("");
-                countText.setText("");
-                floatingView.setVisibility(View.GONE);
-            } else {
-                titleText.setText("New");
-                countText.setText(String.valueOf(count));
+        try {
+            if (isCountdownMode && countdownTarget > System.currentTimeMillis()) {
+                long remaining = countdownTarget - System.currentTimeMillis();
+                String timeStr = formatCountdown(remaining);
+                String displayTitle = countdownTitle.isEmpty() ? "Next" : truncateTitle(countdownTitle, 12);
+                titleText.setText(displayTitle);
+                countText.setText(timeStr);
                 floatingView.setVisibility(View.VISIBLE);
+            } else {
+                // Fallback to counter mode
+                int newCount = prefs.getInt("new_episodes_count", 0);
+                if (newCount != count) {
+                    count = newCount;
+                }
+                if (count == 0) {
+                    titleText.setText("");
+                    countText.setText("");
+                    floatingView.setVisibility(View.GONE);
+                } else {
+                    titleText.setText("New");
+                    countText.setText(String.valueOf(count));
+                    floatingView.setVisibility(View.VISIBLE);
+                }
             }
+        } catch (Exception e) {
+            Log.w(TAG, "updateDisplay UI update failed", e);
         }
     }
 
@@ -229,9 +308,18 @@ public class FloatingAlertService extends Service {
     public void onDestroy() {
         super.onDestroy();
         if (floatingView != null) {
-            windowManager.removeView(floatingView);
+            try {
+                if (windowManager != null) {
+                    windowManager.removeView(floatingView);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "removeView failed", e);
+            }
+            floatingView = null;
         }
-        handler.removeCallbacks(updateRunnable);
+        if (handler != null && updateRunnable != null) {
+            handler.removeCallbacks(updateRunnable);
+        }
     }
 
     @Override

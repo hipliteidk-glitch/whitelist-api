@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
+import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebView;
@@ -44,6 +45,7 @@ import java.net.URL;
 import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG = "MainActivity";
     private static final String CHANNEL_ID = "anime_alerts";
     private static final String CHANNEL_NAME = "Anime Alerts";
     private static final int OVERLAY_PERMISSION_REQUEST = 1001;
@@ -53,6 +55,7 @@ public class MainActivity extends AppCompatActivity {
     private int pendingAnimeId = -1;
     private Handler handler = new Handler(Looper.getMainLooper());
     private int retryCount = 0;
+    private boolean floatingServiceStarted = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,12 +70,22 @@ public class MainActivity extends AppCompatActivity {
         }
 
         requestNotificationPermission();
-        startFloatingService();
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName()));
-            startActivityForResult(intent, OVERLAY_PERMISSION_REQUEST);
+        // Only start floating service if overlay permission already granted.
+        // Otherwise we will request permission and retry in onResume / onActivityResult.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Settings.canDrawOverlays(this)) {
+                startFloatingService();
+            } else {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName()));
+                try {
+                    startActivityForResult(intent, OVERLAY_PERMISSION_REQUEST);
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not launch overlay permission screen", e);
+                }
+            }
+        } else {
+            startFloatingService();
         }
 
         webView = new WebView(this);
@@ -131,20 +144,31 @@ public class MainActivity extends AppCompatActivity {
             retryCount = 0;
             return;
         }
-        webView.evaluateJavascript("typeof openAnimeById !== 'undefined' && openAnimeById(" + id + ");", result -> {
-            if ("true".equals(result) || "null".equals(result) || result == null) {
-                if (result == null || "null".equals(result) || result.isEmpty()) {
-                    retryCount++;
-                    handler.postDelayed(() -> openAnimeWithRetry(id), 500);
+        if (webView == null || isFinishing()) {
+            pendingAnimeId = -1;
+            retryCount = 0;
+            return;
+        }
+        try {
+            webView.evaluateJavascript("typeof openAnimeById !== 'undefined' && openAnimeById(" + id + ");", result -> {
+                if ("true".equals(result) || "null".equals(result) || result == null) {
+                    if (result == null || "null".equals(result) || result.isEmpty()) {
+                        retryCount++;
+                        handler.postDelayed(() -> openAnimeWithRetry(id), 500);
+                    } else {
+                        pendingAnimeId = -1;
+                        retryCount = 0;
+                    }
                 } else {
                     pendingAnimeId = -1;
                     retryCount = 0;
                 }
-            } else {
-                pendingAnimeId = -1;
-                retryCount = 0;
-            }
-        });
+            });
+        } catch (Exception e) {
+            Log.w(TAG, "openAnimeWithRetry failed", e);
+            retryCount++;
+            handler.postDelayed(() -> openAnimeWithRetry(id), 500);
+        }
     }
 
     @Override
@@ -163,6 +187,24 @@ public class MainActivity extends AppCompatActivity {
             prefs.edit().putInt("new_episodes_count", 0).apply();
         }
         handleAnimeIntent(getIntent());
+        // Retry starting floating service if permission was just granted.
+        if (!floatingServiceStarted) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)) {
+                startFloatingService();
+            }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == OVERLAY_PERMISSION_REQUEST) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)) {
+                startFloatingService();
+            } else {
+                Log.i(TAG, "Overlay permission not granted after request");
+            }
+        }
     }
 
     private void handleAnimeIntent(Intent intent) {
@@ -180,11 +222,28 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startFloatingService() {
-        Intent serviceIntent = new Intent(this, FloatingAlertService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent);
-        } else {
-            startService(serviceIntent);
+        // Guard: only start when overlay permission is granted on M+.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Log.i(TAG, "startFloatingService skipped: overlay permission not granted");
+            return;
+        }
+        if (floatingServiceStarted) {
+            Log.d(TAG, "Floating service already started");
+            return;
+        }
+        try {
+            Intent serviceIntent = new Intent(this, FloatingAlertService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+            floatingServiceStarted = true;
+            Log.i(TAG, "Floating service started");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start FloatingAlertService", e);
+            // Do not crash — user can still use the app without overlay.
+            floatingServiceStarted = false;
         }
     }
 
@@ -200,8 +259,17 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        Intent serviceIntent = new Intent(this, FloatingAlertService.class);
-        stopService(serviceIntent);
+        try {
+            Intent serviceIntent = new Intent(this, FloatingAlertService.class);
+            stopService(serviceIntent);
+        } catch (Exception e) {
+            Log.w(TAG, "stopService failed", e);
+        }
+        floatingServiceStarted = false;
+        if (webView != null) {
+            webView.destroy();
+            webView = null;
+        }
     }
 
     private void checkForUpdate(boolean manual) {
@@ -223,6 +291,7 @@ public class MainActivity extends AppCompatActivity {
                 int currentVersion = getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
                 if (remoteVersion > currentVersion) {
                     runOnUiThread(() -> {
+                        if (isFinishing()) return;
                         new AlertDialog.Builder(MainActivity.this)
                                 .setTitle("Update Available")
                                 .setMessage("Version " + remoteVersion + " is available. Download now?")
@@ -231,11 +300,17 @@ public class MainActivity extends AppCompatActivity {
                                 .show();
                     });
                 } else if (manual) {
-                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "You're on the latest version.", Toast.LENGTH_SHORT).show());
+                    runOnUiThread(() -> {
+                        if (isFinishing()) return;
+                        Toast.makeText(MainActivity.this, "You're on the latest version.", Toast.LENGTH_SHORT).show();
+                    });
                 }
             } catch (Exception e) {
                 if (manual) {
-                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Update check failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                    runOnUiThread(() -> {
+                        if (isFinishing()) return;
+                        Toast.makeText(MainActivity.this, "Update check failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    });
                 }
             }
         }).start();
@@ -263,17 +338,39 @@ public class MainActivity extends AppCompatActivity {
                 in.close();
                 runOnUiThread(() -> installUpdate(apkFile));
             } catch (Exception e) {
-                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Download failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    Toast.makeText(MainActivity.this, "Download failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
             }
         }).start();
     }
 
     private void installUpdate(File apkFile) {
-        Uri apkUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", apkFile);
-        Intent intent = new Intent(Intent.ACTION_VIEW);
-        intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(intent);
+        try {
+            Uri apkUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", apkFile);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "installUpdate failed", e);
+            Toast.makeText(this, "Could not open installer: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void safeDeliverCallback(final ValueCallback<String> callback, final String value) {
+        runOnUiThread(() -> {
+            if (webView == null || isFinishing()) {
+                Log.w(TAG, "WebView destroyed before AniList response could be delivered");
+                return;
+            }
+            try {
+                callback.onReceiveValue(value);
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to deliver AniList callback to WebView", e);
+            }
+        });
     }
 
     private class WebAppInterface {
@@ -281,7 +378,7 @@ public class MainActivity extends AppCompatActivity {
          * Native AniList GraphQL proxy. The file:// WebView cannot fetch
          * https://graphql.anilist.co directly, so the page passes its
          * queries here and receives the raw JSON response (or
-         * {"error": "..."} on failure) through the JS callback.
+         * {\"error\": \"...\"} on failure) through the JS callback.
          */
         @JavascriptInterface
         public void anilistFetch(final String query, final String variablesJson,
@@ -298,11 +395,10 @@ public class MainActivity extends AppCompatActivity {
                     JsonObject err = new JsonObject();
                     err.addProperty("error",
                             e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
-                    runOnUiThread(() -> callback.onReceiveValue(err.toString()));
+                    safeDeliverCallback(callback, err.toString());
                     return;
                 }
-                final String ok = result;
-                runOnUiThread(() -> callback.onReceiveValue(ok));
+                safeDeliverCallback(callback, result);
             }).start();
         }
 
@@ -314,7 +410,10 @@ public class MainActivity extends AppCompatActivity {
                         Uri.parse("https://github.com/hipliteidk-glitch/whitelist-api/releases/latest/download/app-release.apk"));
                 startActivity(intent);
             } catch (Exception e) {
-                Toast.makeText(MainActivity.this, "Could not open the download page.", Toast.LENGTH_SHORT).show();
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    Toast.makeText(MainActivity.this, "Could not open the download page.", Toast.LENGTH_SHORT).show();
+                });
             }
         }
 
@@ -331,7 +430,11 @@ public class MainActivity extends AppCompatActivity {
                     .setAutoCancel(true);
 
             NotificationManagerCompat manager = NotificationManagerCompat.from(MainActivity.this);
-            manager.notify((int) System.currentTimeMillis(), builder.build());
+            try {
+                manager.notify((int) System.currentTimeMillis(), builder.build());
+            } catch (SecurityException se) {
+                Log.w(TAG, "Notification permission missing", se);
+            }
 
             int currentCount = prefs.getInt("new_episodes_count", 0);
             prefs.edit().putInt("new_episodes_count", currentCount + 1).apply();
@@ -372,6 +475,7 @@ public class MainActivity extends AppCompatActivity {
         @JavascriptInterface
         public void openKeyboardDemo() {
             runOnUiThread(() -> {
+                if (isFinishing()) return;
                 startActivity(new Intent(MainActivity.this, KeyboardAnimationActivity.class));
             });
         }
