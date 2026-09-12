@@ -1,4 +1,4 @@
-﻿# Local-only folders
+# Local-only folders
 Compressed/
 Deprecated/
 ExtensionPresentation/
@@ -17,3 +17,11 @@ logs/
 Thumbs.db
 desktop.ini
 __pycache__/
+
+# AnimeAlertJava build output (keystore is decoded from keystore.b64 at build time)
+AnimeAlertJava/release.keystore
+AnimeAlertJava/.gradle/
+AnimeAlertJava/app/build/
+AnimeAlertJava/build/
+AnimeAlertJava/local.properties
+*.apk
