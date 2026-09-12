@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebChromeClient;
@@ -31,6 +32,9 @@ import androidx.work.NetworkType;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
+
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -273,6 +277,47 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class WebAppInterface {
+        /**
+         * Native AniList GraphQL proxy. The file:// WebView cannot fetch
+         * https://graphql.anilist.co directly, so the page passes its
+         * queries here and receives the raw JSON response (or
+         * {"error": "..."} on failure) through the JS callback.
+         */
+        @JavascriptInterface
+        public void anilistFetch(final String query, final String variablesJson,
+                                 final ValueCallback<String> callback) {
+            new Thread(() -> {
+                final String result;
+                try {
+                    JsonObject vars = null;
+                    if (variablesJson != null && !variablesJson.trim().isEmpty()) {
+                        vars = JsonParser.parseString(variablesJson).getAsJsonObject();
+                    }
+                    result = AniListClient.query(query, vars);
+                } catch (final Exception e) {
+                    JsonObject err = new JsonObject();
+                    err.addProperty("error",
+                            e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+                    runOnUiThread(() -> callback.onReceiveValue(err.toString()));
+                    return;
+                }
+                final String ok = result;
+                runOnUiThread(() -> callback.onReceiveValue(ok));
+            }).start();
+        }
+
+        /** Opens the latest GitHub Release APK in the system browser/downloader. */
+        @JavascriptInterface
+        public void downloadApk() {
+            try {
+                Intent intent = new Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://github.com/hipliteidk-glitch/whitelist-api/releases/latest/download/app-release.apk"));
+                startActivity(intent);
+            } catch (Exception e) {
+                Toast.makeText(this, "Could not open the download page.", Toast.LENGTH_SHORT).show();
+            }
+        }
+
         @JavascriptInterface
         public void showNotification(String message) {
             SharedPreferences prefs = getSharedPreferences("anime_alert", MODE_PRIVATE);
